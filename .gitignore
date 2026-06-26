@@ -1,3 +1,15 @@
+# Medical imaging data
+*.dcm
+*.nii
+*.nii.gz
+
+# Dataset folders
+data/
+datasets/
+
+# Environment variables
+.env
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
