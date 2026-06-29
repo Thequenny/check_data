@@ -91,8 +91,3 @@ python -m unittest discover -s tests -v
 The tests generate small temporary NIfTI files, so they do not require the full
 example dataset.
 
-## Roadmap
-
-Next planned step:
-
-- `report.py`: generate HTML and PDF reports from the dataset-level JSON output.
