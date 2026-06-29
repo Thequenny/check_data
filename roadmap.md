@@ -28,10 +28,10 @@ Goals:
 To do:
 - Load .nii/.nii.gz files with nibabel
 - Extract:
-  -> volume dimensions
-  -> voxel spacing
-  -> orientation
-  -> datatype
+ -> volume dimensions
+ -> voxel spacing
+ -> orientation
+ -> datatype
 - affine matrix
 
 #### Phase 1.2: Analysis of one patient
@@ -75,12 +75,12 @@ Compare the information, parameters by parameters and evaluate the potential iss
 
 To do:
 - Compute:
-    -> Estimate storage size
-    -> Estimate memory requirement for loading one volume 
-    -> The percentages of CT with the same resolution
-    -> The percentage of CT with the same thickness 
-    -> Percentage of different voxel spacing
-    -> Dimension consistency check
+ -> Estimate storage size
+ -> Estimate memory requirement for loading one volume 
+ -> The percentages of CT with the same resolution
+ -> The percentage of CT with the same thickness 
+ -> Percentage of different voxel spacing
+ -> Dimension consistency check
 - Store all informations in an adequate structure
 
 NB: Storage the JSON file in `data/` and with the name `analyse_dataset`
@@ -90,7 +90,15 @@ NB: Storage the JSON file in `data/` and with the name `analyse_dataset`
 Output:
 
 HTML and PDF report:
-- Dataset overview
+- Number of patients
+- Number of analysed patients
+- Number of failed analyses
+- Minimum memory needed to run the program
+- Number and thickness of slices 2D/3D
+ -> if slices different, write number of patient by slices and corresponding percentages
+- The voxel (volume) on the form: XxYxZ
+ -> if differents sizes, write number of patiens (and percantages) having each voxel
+- Idem with the resolution
 - Statistics
 - Warnings
 - Possible preprocessing recommendations
