@@ -10,7 +10,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from dataset_analyse import identify_dataset_structure  # noqa: E402
+from check_structure_dataset import identify_dataset_structure  # noqa: E402
 
 
 def touch(path: Path) -> None:
