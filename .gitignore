@@ -3,6 +3,9 @@
 *.nii
 *.nii.gz
 
+# folder data
+dataset/
+
 # Environment variables
 .env
 
