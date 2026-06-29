@@ -9,12 +9,13 @@ and generates a report about dataset characteristics, potential issues and prepr
 ### Step 0:
 
 - Identify dataset structure
- * Detect image folders
- * Detect label folders
- * Handle different naming conventions
+ -> Detect image folders
+ -> Detect label folders
+ -> Handle different naming conventions
 - Identify image/label relationship
 - Understand if task is classification or segmentation
 
+Nb: Keep in mind that the names of the dataset folders won't always be the same, as long as they contain the strings 'image' and 'label'
 
 ### Step 1: creation of a first file `nifti_analyzer.py`
 
@@ -27,10 +28,10 @@ Goals:
 To do:
 - Load .nii/.nii.gz files with nibabel
 - Extract:
-  > Volume dimensions
-  > voxel spacing
-  > orientation
-  > datatype
+  -> volume dimensions
+  -> voxel spacing
+  -> orientation
+  -> datatype
 - affine matrix
 
 #### Phase 1.2: Analysis of one patient
@@ -55,6 +56,7 @@ Store patient information in a dictionary or JSON structure
 - The annotation (if present and say when no)
 - Intensities informations
 
+NB: Storage the JSON file in `data/`
 ### Step 2: A second file `dataset_analyzer.py`
 
 #### Phase 2.1: Data recovery
@@ -64,7 +66,7 @@ Analyse all patients
 To do:
 -  Count number of patients
 - Iterate through dataset folder
-- Run analyze_patient.py for each .nii.gz file
+- Run analyze_patient.py for each .nii.gz or .nii file
 - Store all informations in an adequate structure
 
 #### Phase 2.2: Data evaluation
@@ -73,16 +75,17 @@ Compare the information, parameters by parameters and evaluate the potential iss
 
 To do:
 - Compute:
-    > Estimate storage size
-    > Estimate memory requirement for loading one volume 
-    > The percentages of CT with the same resolution
-    > The percentage of CT with the same thickness 
-    > Percentage of different voxel spacing
-    > Dimension consistency check
+    -> Estimate storage size
+    -> Estimate memory requirement for loading one volume 
+    -> The percentages of CT with the same resolution
+    -> The percentage of CT with the same thickness 
+    -> Percentage of different voxel spacing
+    -> Dimension consistency check
 - Store all informations in an adequate structure
 
+NB: Storage the JSON file in `data/` and with the name `analyse_dataset`
 
-### Step 3: Report generation in a file `report.py`
+### Step 3: Report generation named `report.py` in the folder `data/`
 
 Output:
 
