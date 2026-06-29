@@ -72,7 +72,7 @@ The dataset analysis includes:
 
 - number of detected, analyzed, and failed patients
 - annotation coverage
-- storage size in readable units
+- storage size 
 - minimum memory estimate
 - slice count and slice thickness distributions
 - voxel spacing and resolution distributions
