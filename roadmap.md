@@ -9,9 +9,9 @@ and generates a report about dataset characteristics, potential issues and prepr
 ### Step 0:
 
 - Identify dataset structure
- > Detect image folders
- > Detect label folders
- > Handle different naming conventions
+ * Detect image folders
+ * Detect label folders
+ * Handle different naming conventions
 - Identify image/label relationship
 - Understand if task is classification or segmentation
 
