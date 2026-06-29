@@ -26,7 +26,7 @@ Goals:
 - Read metadata
 
 To do:
-- Load .nii/.nii.gz files with nibabel
+- Load `.nii/.nii.gz` files with nibabel
 - Extract:
  -> volume dimensions
  -> voxel spacing
@@ -66,7 +66,7 @@ Analyse all patients
 To do:
 -  Count number of patients
 - Iterate through dataset folder
-- Run analyze_patient.py for each .nii.gz or .nii file
+- Run analyze_patient.py for each `.nii.gz` or `.nii` file
 - Store all informations in an adequate structure
 
 #### Phase 2.2: Data evaluation
@@ -87,6 +87,9 @@ NB: Storage the JSON file in `data/` and with the name `analyse_dataset`
 
 ### Step 3: Report generation named `report.py` in the folder `data/`
 
+Input: `data\analyse_dataset.json`
+
+
 Output:
 
 HTML and PDF report:
@@ -102,3 +105,7 @@ HTML and PDF report:
 - Statistics
 - Warnings
 - Possible preprocessing recommendations
+
+Format:
+- Medical format
+- Use table if necessary 
