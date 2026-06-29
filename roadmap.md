@@ -1,12 +1,12 @@
 # Roadmap of Medical Imaging Dataset Analyzer 
 
-# Objective
+## Objective
 
 Create a tool that analyzes NIfTI CT datasets
 and generates a report about dataset characteristics, potential issues and preprocessing considerations before AI training
 
 --------------------------------------
-# Step 0:
+### Step 0:
 
 - Identify dataset structure
  -> Detect image folders
