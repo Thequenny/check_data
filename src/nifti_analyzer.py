@@ -27,6 +27,7 @@ else:
 
 
 NIFTI_EXTENSIONS = (".nii.gz", ".nii")
+DEFAULT_OUTPUT = Path(__file__).resolve().parents[1] / "data" / "CT_data.json"
 
 
 @dataclass
@@ -45,6 +46,8 @@ class NiftiMetadata:
 
     path: str
     dimensions: list[int]
+    number_of_slices: int
+    slice_thickness: float | None
     voxel_spacing: list[float]
     orientation: list[str]
     datatype: str
@@ -128,6 +131,8 @@ def read_nifti_metadata(path: str | Path) -> NiftiMetadata:
     metadata = NiftiMetadata(
         path=str(nifti_path),
         dimensions=list(shape),
+        number_of_slices=_number_of_slices(shape),
+        slice_thickness=_slice_thickness(zooms),
         voxel_spacing=list(zooms),
         orientation=list(nib.orientations.aff2axcodes(image.affine)),
         datatype=datatype,
@@ -282,6 +287,20 @@ def _compute_physical_voxel_size(zooms: tuple[float, ...]) -> float | None:
     return float(np.prod(spatial_zooms, dtype=np.float64))
 
 
+def _number_of_slices(shape: tuple[int, ...]) -> int:
+    if len(shape) >= 3:
+        return int(shape[2])
+    if len(shape) >= 2:
+        return 1
+    return 0
+
+
+def _slice_thickness(zooms: tuple[float, ...]) -> float | None:
+    if len(zooms) < 3:
+        return None
+    return float(zooms[2])
+
+
 def _matrix_to_list(matrix: np.ndarray) -> list[list[float]]:
     return [[float(value) for value in row] for row in matrix.tolist()]
 
@@ -327,15 +346,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--output",
-        help="Optional JSON output path. If omitted, JSON is printed to stdout.",
+        default=str(DEFAULT_OUTPUT),
+        help="JSON output path. Defaults to data\\CT_data.json.",
     )
     args = parser.parse_args(argv)
 
     analysis = analyze_patient(args.image, args.label)
-    if args.output:
-        save_patient_analysis(analysis, args.output)
-    else:
-        print(json.dumps(analysis.to_dict(), indent=2))
+    save_patient_analysis(analysis, args.output)
+    print(f"Patient analysis written to: {Path(args.output).resolve()}")
     return 0
 
 

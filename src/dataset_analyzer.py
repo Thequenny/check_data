@@ -22,6 +22,7 @@ from nifti_analyzer import NiftiMetadata, PatientAnalysis, analyze_patient
 
 SPATIAL_ROUNDING_DIGITS = 3
 ALIGNMENT_TOLERANCE = 1e-3
+DEFAULT_OUTPUT = Path(__file__).resolve().parents[1] / "data" / "analyse_dataset.json"
 
 
 @dataclass
@@ -363,6 +364,7 @@ class ReportTaskDetection:
 
     detected_task: str
     reason: str
+    classification_classes: list[str]
     labels_found: bool
     label_files_detected: int
     image_label_pairs_detected: int
@@ -1331,6 +1333,7 @@ def _build_report_preparation(
     task_detection = ReportTaskDetection(
         detected_task=structure.task_type,
         reason=structure.task_reason,
+        classification_classes=structure.classification_classes,
         labels_found=counts.label_files_detected > 0,
         label_files_detected=counts.label_files_detected,
         image_label_pairs_detected=counts.image_label_pairs_detected,
@@ -1761,7 +1764,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("dataset_root", help="Path to the dataset root.")
     parser.add_argument(
         "--output",
-        help="Optional JSON output path. If omitted, a summary is printed.",
+        default=str(DEFAULT_OUTPUT),
+        help="JSON output path. Defaults to data\\analyse_dataset.json.",
     )
     parser.add_argument(
         "--split",
@@ -1781,12 +1785,11 @@ def main(argv: list[str] | None = None) -> int:
 
     selected_split = None if args.split == "all" else args.split
     analysis = analyze_dataset(args.dataset_root, split=selected_split)
-    if args.output:
-        save_dataset_analysis(analysis, args.output)
-    elif args.json:
+    if args.json:
         print(json.dumps(analysis.to_dict(), indent=2))
     else:
-        print(_format_summary(analysis))
+        save_dataset_analysis(analysis, args.output)
+        print(f"Dataset analysis written to: {Path(args.output).resolve()}")
     return 0
 
 

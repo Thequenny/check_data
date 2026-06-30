@@ -113,7 +113,7 @@ HTML report:
 - Minimum memory needed to run the program (in MB or KB)
 - Number and thickness of slices 2D/3D
  -> if slices different, write number of patient by slices and corresponding percentages
-- The voxel size (resolution) and volume on the form: XxYxZ
+- The voxel size (resolution) in the form: XxYxZ
  -> if differents sizes, write number of patiens (and percantages) having each voxel
 - Intensity:
  -> Minimum

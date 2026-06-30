@@ -166,6 +166,9 @@ class DatasetStructure:
     root: str
     task_type: str
     task_reason: str
+    training_folders: list[str]
+    test_folders: list[str]
+    classification_classes: list[str]
     image_folders: list[str]
     label_folders: list[str]
     unknown_folders: list[str]
@@ -234,6 +237,12 @@ def identify_dataset_structure(dataset_root: str | Path) -> DatasetStructure:
     )
 
     folder_summaries = _build_folder_summaries(root, nifti_paths, folder_roles)
+    training_folders = sorted(
+        item.path for item in folder_summaries if item.split == "train"
+    )
+    test_folders = sorted(
+        item.path for item in folder_summaries if item.split == "test"
+    )
     image_folders = sorted(item.path for item in folder_summaries if item.role == "image")
     label_folders = sorted(item.path for item in folder_summaries if item.role == "label")
     unknown_folders = sorted(
@@ -248,6 +257,7 @@ def identify_dataset_structure(dataset_root: str | Path) -> DatasetStructure:
         label_files=label_files,
         pairs=image_label_pairs,
     )
+    classification_classes = _classification_classes(root, image_files, task_type)
 
     if unknown_files:
         warnings.append(
@@ -260,6 +270,9 @@ def identify_dataset_structure(dataset_root: str | Path) -> DatasetStructure:
         root=str(root),
         task_type=task_type,
         task_reason=task_reason,
+        training_folders=training_folders,
+        test_folders=test_folders,
+        classification_classes=classification_classes,
         image_folders=image_folders,
         label_folders=label_folders,
         unknown_folders=unknown_folders,
@@ -583,12 +596,22 @@ def _infer_task_type(
         return "classification", f"Images are grouped in class-like folders: {folders}."
 
     if image_files and not label_files:
-        return "unknown", "Only image NIfTI files were detected; labels/classes are unclear."
+        return "classification", "No label NIfTI files were detected."
 
     if label_files and not pairs:
         return "unknown", "Label NIfTI files exist but could not be linked to images."
 
     return "unknown", "No usable NIfTI image structure was detected."
+
+
+def _classification_classes(
+    root: Path,
+    image_files: list[NiftiFileSummary],
+    task_type: str,
+) -> list[str]:
+    if task_type != "classification":
+        return []
+    return sorted(_class_folder_candidates(root, image_files))
 
 
 def _manifest_describes_segmentation(manifest: dict[str, Any]) -> bool:
@@ -828,6 +851,9 @@ def _format_summary(structure: DatasetStructure) -> str:
     lines = [
         f"Dataset root: {structure.root}",
         f"Task type: {structure.task_type} ({structure.task_reason})",
+        f"Training folders: {len(structure.training_folders)}",
+        f"Test folders: {len(structure.test_folders)}",
+        f"Classification classes: {', '.join(structure.classification_classes) or 'none'}",
         f"Image folders: {len(structure.image_folders)}",
         f"Label folders: {len(structure.label_folders)}",
         f"Image files: {len(structure.image_files)}",

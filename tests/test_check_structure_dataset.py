@@ -43,8 +43,11 @@ class DatasetStructureDiscoveryTests(unittest.TestCase):
             structure = identify_dataset_structure(root)
 
             self.assertEqual(structure.task_type, "segmentation")
+            self.assertEqual(structure.training_folders, ["imagesTr", "labelsTr"])
+            self.assertEqual(structure.test_folders, ["imagesTs"])
             self.assertEqual(structure.image_folders, ["imagesTr", "imagesTs"])
             self.assertEqual(structure.label_folders, ["labelsTr"])
+            self.assertEqual(structure.classification_classes, [])
             self.assertEqual(len(structure.image_label_pairs), 1)
             self.assertEqual(structure.image_label_pairs[0].source, "dataset.json")
             self.assertEqual(structure.unmatched_images, [])
@@ -86,6 +89,7 @@ class DatasetStructureDiscoveryTests(unittest.TestCase):
 
             self.assertEqual(structure.task_type, "classification")
             self.assertEqual(len(structure.image_files), 2)
+            self.assertEqual(structure.classification_classes, ["benign", "malignant"])
             self.assertIn("class-like folders", structure.task_reason)
 
 

@@ -47,6 +47,8 @@ class NiftiAnalyzerTests(unittest.TestCase):
             analysis = analyze_nifti_volume(path)
 
             self.assertEqual(metadata.dimensions, [2, 3, 4])
+            self.assertEqual(metadata.number_of_slices, 4)
+            self.assertEqual(metadata.slice_thickness, 3.0)
             self.assertEqual(metadata.voxel_spacing, [1.0, 2.0, 3.0])
             self.assertEqual(metadata.orientation, ["R", "A", "S"])
             self.assertEqual(metadata.datatype, "float32")
@@ -95,6 +97,7 @@ class NiftiAnalyzerTests(unittest.TestCase):
             self.assertEqual(saved["patient_id"], "patient_03")
             self.assertFalse(saved["annotation"]["present"])
             self.assertEqual(saved["image"]["metadata"]["dimensions"], [2, 2, 2])
+            self.assertEqual(saved["image"]["metadata"]["number_of_slices"], 2)
 
 
 if __name__ == "__main__":

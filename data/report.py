@@ -99,6 +99,10 @@ def _build_html_report(analysis: dict[str, Any]) -> str:
                 [
                     ["Detected task", task_detection["detected_task"]],
                     ["Reason", task_detection["reason"]],
+                    [
+                        "Classification classes",
+                        _format_text_list(task_detection.get("classification_classes", [])),
+                    ],
                     ["Labels found", _yes_no(task_detection["labels_found"])],
                     ["Label files detected", task_detection["label_files_detected"]],
                     [
@@ -139,7 +143,7 @@ def _build_html_report(analysis: dict[str, Any]) -> str:
         _section(
             "Voxel Size",
             _subsection(
-                "Voxel Size (X x Y x Z mm)",
+                "Voxel Size (XxYxZ mm)",
                 _frequency_table(consistency["voxel_spacing_frequencies"]),
             ),
         ),
@@ -402,7 +406,7 @@ def _frequency_table(items: list[dict[str, Any]]) -> str:
     return _table(
         ["Value", "Number of patients", "Percentage"],
         (
-            [item.get("display_value", item.get("value")), item["count"], f"{item['percentage']}%"]
+            [_frequency_display_value(item), item["count"], f"{item['percentage']}%"]
             for item in items
         ),
     )
@@ -599,6 +603,10 @@ def _build_text_report(analysis: dict[str, Any]) -> list[str]:
         [
             ("Detected task", task_detection["detected_task"]),
             ("Reason", task_detection["reason"]),
+            (
+                "Classification classes",
+                _format_text_list(task_detection.get("classification_classes", [])),
+            ),
             ("Labels found", _yes_no(task_detection["labels_found"])),
             ("Label files detected", task_detection["label_files_detected"]),
             ("Image/label pairs", task_detection["image_label_pairs_detected"]),
@@ -753,7 +761,14 @@ def _build_text_report(analysis: dict[str, Any]) -> list[str]:
 
 def _frequency_text_rows(items: list[dict[str, Any]]) -> Iterable[list[Any]]:
     for item in items:
-        yield [item.get("display_value", item.get("value")), item["count"], item["percentage"]]
+        yield [_frequency_display_value(item), item["count"], item["percentage"]]
+
+
+def _frequency_display_value(item: dict[str, Any]) -> Any:
+    value = item.get("value")
+    if isinstance(value, list):
+        return value
+    return item.get("display_value", value)
 
 
 def _format_missing_fields(fields: list[str]) -> str:
@@ -765,6 +780,10 @@ def _format_label_list(values: list[str]) -> str:
 
 
 def _format_patient_ids(values: list[str]) -> str:
+    return _format_text_list(values)
+
+
+def _format_text_list(values: list[str]) -> str:
     if not values:
         return "None"
     return ", ".join(values)
@@ -926,7 +945,7 @@ def _format_value(value: Any) -> str:
     if isinstance(value, float):
         return f"{value:.3f}".rstrip("0").rstrip(".")
     if isinstance(value, list):
-        return " x ".join(_format_value(item) for item in value)
+        return "x".join(_format_value(item) for item in value)
     return str(value)
 
 
@@ -940,7 +959,7 @@ def _escape(value: Any) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Generate HTML and PDF reports from analyse_dataset.json."
+        description="Generate an HTML report from analyse_dataset.json."
     )
     parser.add_argument(
         "--input",
