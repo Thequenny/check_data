@@ -1,0 +1,791 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [4 0 R 6 0 R 8 0 R 10 0 R 12 0 R 14 0 R] /Count 6 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 5 0 R >>
+endobj
+5 0 obj
+<< /Length 2283 >>
+stream
+BT
+/F1 9 Tf
+40 805 Td
+12 TL
+() Tj
+T*
+(Medical Imaging Dataset Analysis Report) Tj
+T*
+(=======================================) Tj
+T*
+(Dataset: Task09_Spleen) Tj
+T*
+(Generated: 2026-06-30 09:46) Tj
+T*
+(Task: segmentation \(dataset.json contains image/label training pairs.\)) Tj
+T*
+() Tj
+T*
+(Dataset Overview) Tj
+T*
+(================) Tj
+T*
+(Dataset root: C:\\Users\\lelen\\Desktop\\Recherches stage\\Stage) Tj
+T*
+(Japon\\Hokkaido\\Stage\\check_data_project\\check_data\\dataset\\Task09_Spleen) Tj
+T*
+(Split: all) Tj
+T*
+(Patients detected: 61) Tj
+T*
+(Patients analysed: 61) Tj
+T*
+(Failed analyses: 0) Tj
+T*
+(Patients with missing data: 20) Tj
+T*
+(Total storage: 1.61 GB) Tj
+T*
+(Minimum memory: 176.16 MB) Tj
+T*
+() Tj
+T*
+(Task Detection) Tj
+T*
+(==============) Tj
+T*
+(Detected task: segmentation) Tj
+T*
+(Reason: dataset.json contains image/label training pairs.) Tj
+T*
+(Labels found: Yes) Tj
+T*
+(Label files detected: 41) Tj
+T*
+(Image/label pairs: 41) Tj
+T*
+() Tj
+T*
+(Missing Data) Tj
+T*
+(============) Tj
+T*
+(Patient ID | Split | Missing data) Tj
+T*
+(---------- | ----- | ----------------) Tj
+T*
+(spleen_1   | test  | annotation_label) Tj
+T*
+(spleen_11  | test  | annotation_label) Tj
+T*
+(spleen_15  | test  | annotation_label) Tj
+T*
+(spleen_23  | test  | annotation_label) Tj
+T*
+(spleen_30  | test  | annotation_label) Tj
+T*
+(spleen_34  | test  | annotation_label) Tj
+T*
+(spleen_35  | test  | annotation_label) Tj
+T*
+(spleen_36  | test  | annotation_label) Tj
+T*
+(spleen_37  | test  | annotation_label) Tj
+T*
+(spleen_39  | test  | annotation_label) Tj
+T*
+(spleen_42  | test  | annotation_label) Tj
+T*
+(spleen_43  | test  | annotation_label) Tj
+T*
+(spleen_48  | test  | annotation_label) Tj
+T*
+(spleen_50  | test  | annotation_label) Tj
+T*
+(spleen_51  | test  | annotation_label) Tj
+T*
+(spleen_54  | test  | annotation_label) Tj
+T*
+(spleen_55  | test  | annotation_label) Tj
+T*
+(spleen_57  | test  | annotation_label) Tj
+T*
+(spleen_58  | test  | annotation_label) Tj
+T*
+(spleen_7   | test  | annotation_label) Tj
+T*
+() Tj
+T*
+(Memory) Tj
+T*
+(======) Tj
+T*
+(Minimum memory needed: 176.16 MB) Tj
+T*
+(Basis: Largest image loaded as float32, which is how analyze_nifti_volume reads CT voxel data.) Tj
+T*
+(Largest native volume: 176.16 MB) Tj
+T*
+(Largest float32 volume: 176.16 MB) Tj
+T*
+ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 7 0 R >>
+endobj
+7 0 obj
+<< /Length 2162 >>
+stream
+BT
+/F1 9 Tf
+40 805 Td
+12 TL
+() Tj
+T*
+(Slices) Tj
+T*
+(======) Tj
+T*
+(Dimensionality | Patients | %) Tj
+T*
+(-------------- | -------- | ---) Tj
+T*
+(3D             | 61       | 100) Tj
+T*
+(Slice count | Patients | %) Tj
+T*
+(----------- | -------- | ----) Tj
+T*
+(94          | 3        | 4.92) Tj
+T*
+(103         | 2        | 3.28) Tj
+T*
+(112         | 2        | 3.28) Tj
+T*
+(168         | 2        | 3.28) Tj
+T*
+(44          | 2        | 3.28) Tj
+T*
+(48          | 2        | 3.28) Tj
+T*
+(50          | 2        | 3.28) Tj
+T*
+(61          | 2        | 3.28) Tj
+T*
+(89          | 2        | 3.28) Tj
+T*
+(96          | 2        | 3.28) Tj
+T*
+(98          | 2        | 3.28) Tj
+T*
+(100         | 1        | 1.64) Tj
+T*
+(101         | 1        | 1.64) Tj
+T*
+(102         | 1        | 1.64) Tj
+T*
+(104         | 1        | 1.64) Tj
+T*
+(114         | 1        | 1.64) Tj
+T*
+(119         | 1        | 1.64) Tj
+T*
+(129         | 1        | 1.64) Tj
+T*
+(135         | 1        | 1.64) Tj
+T*
+(148         | 1        | 1.64) Tj
+T*
+(156         | 1        | 1.64) Tj
+T*
+(157         | 1        | 1.64) Tj
+T*
+(164         | 1        | 1.64) Tj
+T*
+(31          | 1        | 1.64) Tj
+T*
+(33          | 1        | 1.64) Tj
+T*
+(34          | 1        | 1.64) Tj
+T*
+(36          | 1        | 1.64) Tj
+T*
+(38          | 1        | 1.64) Tj
+T*
+(40          | 1        | 1.64) Tj
+T*
+(41          | 1        | 1.64) Tj
+T*
+(51          | 1        | 1.64) Tj
+T*
+(54          | 1        | 1.64) Tj
+T*
+(55          | 1        | 1.64) Tj
+T*
+(56          | 1        | 1.64) Tj
+T*
+(60          | 1        | 1.64) Tj
+T*
+(65          | 1        | 1.64) Tj
+T*
+(67          | 1        | 1.64) Tj
+T*
+(77          | 1        | 1.64) Tj
+T*
+(80          | 1        | 1.64) Tj
+T*
+(83          | 1        | 1.64) Tj
+T*
+(86          | 1        | 1.64) Tj
+T*
+(87          | 1        | 1.64) Tj
+T*
+(88          | 1        | 1.64) Tj
+T*
+(90          | 1        | 1.64) Tj
+T*
+(92          | 1        | 1.64) Tj
+T*
+(93          | 1        | 1.64) Tj
+T*
+(95          | 1        | 1.64) Tj
+T*
+(97          | 1        | 1.64) Tj
+T*
+(99          | 1        | 1.64) Tj
+T*
+(Thickness \(mm\) | Patients | %) Tj
+T*
+ET
+endstream
+endobj
+8 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 9 0 R >>
+endobj
+9 0 obj
+<< /Length 2670 >>
+stream
+BT
+/F1 9 Tf
+40 805 Td
+12 TL
+(-------------- | -------- | -----) Tj
+T*
+(5              | 41       | 67.21) Tj
+T*
+(2.5            | 6        | 9.84) Tj
+T*
+(1.5            | 4        | 6.56) Tj
+T*
+(4              | 4        | 6.56) Tj
+T*
+(1.6            | 2        | 3.28) Tj
+T*
+(3              | 1        | 1.64) Tj
+T*
+(7              | 1        | 1.64) Tj
+T*
+(7.5            | 1        | 1.64) Tj
+T*
+(8              | 1        | 1.64) Tj
+T*
+() Tj
+T*
+(Voxel Size and Volume) Tj
+T*
+(=====================) Tj
+T*
+(Voxel size XxYxZ \(mm\) | Patients | %) Tj
+T*
+(--------------------- | -------- | ----) Tj
+T*
+(0.977 x 0.977 x 5     | 3        | 4.92) Tj
+T*
+(0.684 x 0.684 x 5     | 2        | 3.28) Tj
+T*
+(0.703 x 0.703 x 5     | 2        | 3.28) Tj
+T*
+(0.74 x 0.74 x 5       | 2        | 3.28) Tj
+T*
+(0.797 x 0.797 x 5     | 2        | 3.28) Tj
+T*
+(0.613 x 0.613 x 2.5   | 1        | 1.64) Tj
+T*
+(0.633 x 0.633 x 5     | 1        | 1.64) Tj
+T*
+(0.643 x 0.643 x 5     | 1        | 1.64) Tj
+T*
+(0.647 x 0.647 x 5     | 1        | 1.64) Tj
+T*
+(0.66 x 0.66 x 5       | 1        | 1.64) Tj
+T*
+(0.676 x 0.676 x 5     | 1        | 1.64) Tj
+T*
+(0.699 x 0.699 x 7     | 1        | 1.64) Tj
+T*
+(0.719 x 0.719 x 2.5   | 1        | 1.64) Tj
+T*
+(0.727 x 0.727 x 2.5   | 1        | 1.64) Tj
+T*
+(0.734 x 0.734 x 5     | 1        | 1.64) Tj
+T*
+(0.738 x 0.738 x 5     | 1        | 1.64) Tj
+T*
+(0.741 x 0.741 x 5     | 1        | 1.64) Tj
+T*
+(0.742 x 0.742 x 2.5   | 1        | 1.64) Tj
+T*
+(0.742 x 0.742 x 5     | 1        | 1.64) Tj
+T*
+(0.744 x 0.744 x 5     | 1        | 1.64) Tj
+T*
+(0.75 x 0.75 x 5       | 1        | 1.64) Tj
+T*
+(0.752 x 0.752 x 5     | 1        | 1.64) Tj
+T*
+(0.754 x 0.754 x 1.5   | 1        | 1.64) Tj
+T*
+(0.77 x 0.77 x 4       | 1        | 1.64) Tj
+T*
+(0.773 x 0.773 x 5     | 1        | 1.64) Tj
+T*
+(0.785 x 0.785 x 5     | 1        | 1.64) Tj
+T*
+(0.785 x 0.785 x 7.5   | 1        | 1.64) Tj
+T*
+(0.793 x 0.793 x 5     | 1        | 1.64) Tj
+T*
+(0.793 x 0.793 x 8     | 1        | 1.64) Tj
+T*
+(0.795 x 0.795 x 1.6   | 1        | 1.64) Tj
+T*
+(0.795 x 0.795 x 5     | 1        | 1.64) Tj
+T*
+(0.803 x 0.803 x 5     | 1        | 1.64) Tj
+T*
+(0.805 x 0.805 x 4     | 1        | 1.64) Tj
+T*
+(0.828 x 0.828 x 5     | 1        | 1.64) Tj
+T*
+(0.836 x 0.836 x 3     | 1        | 1.64) Tj
+T*
+(0.838 x 0.838 x 5     | 1        | 1.64) Tj
+T*
+(0.852 x 0.852 x 5     | 1        | 1.64) Tj
+T*
+(0.854 x 0.854 x 4     | 1        | 1.64) Tj
+T*
+(0.859 x 0.859 x 2.5   | 1        | 1.64) Tj
+T*
+(0.859 x 0.859 x 5     | 1        | 1.64) Tj
+T*
+(0.871 x 0.871 x 5     | 1        | 1.64) Tj
+T*
+(0.889 x 0.889 x 5     | 1        | 1.64) Tj
+T*
+(0.902 x 0.902 x 5     | 1        | 1.64) Tj
+T*
+ET
+endstream
+endobj
+10 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 11 0 R >>
+endobj
+11 0 obj
+<< /Length 3043 >>
+stream
+BT
+/F1 9 Tf
+40 805 Td
+12 TL
+(0.904 x 0.904 x 5     | 1        | 1.64) Tj
+T*
+(0.906 x 0.906 x 5     | 1        | 1.64) Tj
+T*
+(0.92 x 0.92 x 1.6     | 1        | 1.64) Tj
+T*
+(0.924 x 0.924 x 5     | 1        | 1.64) Tj
+T*
+(0.93 x 0.93 x 5       | 1        | 1.64) Tj
+T*
+(0.934 x 0.934 x 1.5   | 1        | 1.64) Tj
+T*
+(0.938 x 0.938 x 5     | 1        | 1.64) Tj
+T*
+(0.951 x 0.951 x 5     | 1        | 1.64) Tj
+T*
+(0.961 x 0.961 x 4     | 1        | 1.64) Tj
+T*
+(0.967 x 0.967 x 1.5   | 1        | 1.64) Tj
+T*
+(0.969 x 0.969 x 1.5   | 1        | 1.64) Tj
+T*
+(0.977 x 0.977 x 2.5   | 1        | 1.64) Tj
+T*
+(Physical volume XxYxZ \(mm\) | Patients | %) Tj
+T*
+(-------------------------- | -------- | ----) Tj
+T*
+(360 x 360 x 480            | 2        | 3.28) Tj
+T*
+(314 x 314 x 237.5          | 1        | 1.64) Tj
+T*
+(324 x 324 x 495            | 1        | 1.64) Tj
+T*
+(329 x 329 x 170            | 1        | 1.64) Tj
+T*
+(331.264 x 331.264 x 240    | 1        | 1.64) Tj
+T*
+(337.92 x 337.92 x 430      | 1        | 1.64) Tj
+T*
+(346 x 346 x 400            | 1        | 1.64) Tj
+T*
+(350 x 350 x 220            | 1        | 1.64) Tj
+T*
+(350 x 350 x 325            | 1        | 1.64) Tj
+T*
+(358 x 358 x 230.999        | 1        | 1.64) Tj
+T*
+(368 x 368 x 217.5          | 1        | 1.64) Tj
+T*
+(372 x 372 x 222.5          | 1        | 1.64) Tj
+T*
+(376 x 376 x 470            | 1        | 1.64) Tj
+T*
+(378 x 378 x 200            | 1        | 1.64) Tj
+T*
+(379 x 379 x 190            | 1        | 1.64) Tj
+T*
+(379 x 379 x 280            | 1        | 1.64) Tj
+T*
+(379.392 x 379.392 x 490    | 1        | 1.64) Tj
+T*
+(380 x 380 x 192.5          | 1        | 1.64) Tj
+T*
+(380 x 380 x 445            | 1        | 1.64) Tj
+T*
+(381 x 381 x 205            | 1        | 1.64) Tj
+T*
+(384 x 384 x 465            | 1        | 1.64) Tj
+T*
+(385 x 385 x 300            | 1        | 1.64) Tj
+T*
+(386 x 386 x 252            | 1        | 1.64) Tj
+T*
+(394 x 394 x 476            | 1        | 1.64) Tj
+T*
+(396 x 396 x 505            | 1        | 1.64) Tj
+T*
+(402 x 402 x 232.5          | 1        | 1.64) Tj
+T*
+(402 x 402 x 440            | 1        | 1.64) Tj
+T*
+(406 x 406 x 485            | 1        | 1.64) Tj
+T*
+(406 x 406 x 488            | 1        | 1.64) Tj
+T*
+(407 x 407 x 251.202        | 1        | 1.64) Tj
+T*
+(407 x 407 x 450            | 1        | 1.64) Tj
+T*
+(408 x 408 x 250            | 1        | 1.64) Tj
+T*
+(408 x 408 x 255            | 1        | 1.64) Tj
+T*
+(411 x 411 x 335            | 1        | 1.64) Tj
+T*
+(412 x 412 x 448            | 1        | 1.64) Tj
+T*
+(424 x 424 x 515            | 1        | 1.64) Tj
+T*
+(428 x 428 x 468            | 1        | 1.64) Tj
+T*
+(429 x 429 x 180            | 1        | 1.64) Tj
+T*
+(436 x 436 x 270            | 1        | 1.64) Tj
+T*
+(437 x 437 x 244            | 1        | 1.64) Tj
+T*
+(440 x 440 x 255            | 1        | 1.64) Tj
+T*
+(440 x 440 x 515            | 1        | 1.64) Tj
+T*
+(446 x 446 x 460            | 1        | 1.64) Tj
+T*
+(455 x 455 x 500            | 1        | 1.64) Tj
+T*
+ET
+endstream
+endobj
+12 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 13 0 R >>
+endobj
+13 0 obj
+<< /Length 2681 >>
+stream
+BT
+/F1 9 Tf
+40 805 Td
+12 TL
+(462 x 462 x 520            | 1        | 1.64) Tj
+T*
+(463 x 463 x 470            | 1        | 1.64) Tj
+T*
+(464 x 464 x 470            | 1        | 1.64) Tj
+T*
+(471 x 471 x 216.001        | 1        | 1.64) Tj
+T*
+(473 x 473 x 415            | 1        | 1.64) Tj
+T*
+(476 x 476 x 490            | 1        | 1.64) Tj
+T*
+(478 x 478 x 252            | 1        | 1.64) Tj
+T*
+(480 x 480 x 220            | 1        | 1.64) Tj
+T*
+(487 x 487 x 250            | 1        | 1.64) Tj
+T*
+(492 x 492 x 448            | 1        | 1.64) Tj
+T*
+(495 x 495 x 246            | 1        | 1.64) Tj
+T*
+(496 x 496 x 222            | 1        | 1.64) Tj
+T*
+(500 x 500 x 240            | 1        | 1.64) Tj
+T*
+(500 x 500 x 275            | 1        | 1.64) Tj
+T*
+(500 x 500 x 285            | 1        | 1.64) Tj
+T*
+(500 x 500 x 645            | 1        | 1.64) Tj
+T*
+(Dimensions XxYxZ | Patients | %) Tj
+T*
+(---------------- | -------- | ----) Tj
+T*
+(512 x 512 x 94   | 3        | 4.92) Tj
+T*
+(512 x 512 x 103  | 2        | 3.28) Tj
+T*
+(512 x 512 x 112  | 2        | 3.28) Tj
+T*
+(512 x 512 x 168  | 2        | 3.28) Tj
+T*
+(512 x 512 x 44   | 2        | 3.28) Tj
+T*
+(512 x 512 x 48   | 2        | 3.28) Tj
+T*
+(512 x 512 x 50   | 2        | 3.28) Tj
+T*
+(512 x 512 x 61   | 2        | 3.28) Tj
+T*
+(512 x 512 x 89   | 2        | 3.28) Tj
+T*
+(512 x 512 x 96   | 2        | 3.28) Tj
+T*
+(512 x 512 x 98   | 2        | 3.28) Tj
+T*
+(512 x 512 x 100  | 1        | 1.64) Tj
+T*
+(512 x 512 x 101  | 1        | 1.64) Tj
+T*
+(512 x 512 x 102  | 1        | 1.64) Tj
+T*
+(512 x 512 x 104  | 1        | 1.64) Tj
+T*
+(512 x 512 x 114  | 1        | 1.64) Tj
+T*
+(512 x 512 x 119  | 1        | 1.64) Tj
+T*
+(512 x 512 x 129  | 1        | 1.64) Tj
+T*
+(512 x 512 x 135  | 1        | 1.64) Tj
+T*
+(512 x 512 x 148  | 1        | 1.64) Tj
+T*
+(512 x 512 x 156  | 1        | 1.64) Tj
+T*
+(512 x 512 x 157  | 1        | 1.64) Tj
+T*
+(512 x 512 x 164  | 1        | 1.64) Tj
+T*
+(512 x 512 x 31   | 1        | 1.64) Tj
+T*
+(512 x 512 x 33   | 1        | 1.64) Tj
+T*
+(512 x 512 x 34   | 1        | 1.64) Tj
+T*
+(512 x 512 x 36   | 1        | 1.64) Tj
+T*
+(512 x 512 x 38   | 1        | 1.64) Tj
+T*
+(512 x 512 x 40   | 1        | 1.64) Tj
+T*
+(512 x 512 x 41   | 1        | 1.64) Tj
+T*
+(512 x 512 x 51   | 1        | 1.64) Tj
+T*
+(512 x 512 x 54   | 1        | 1.64) Tj
+T*
+(512 x 512 x 55   | 1        | 1.64) Tj
+T*
+(512 x 512 x 56   | 1        | 1.64) Tj
+T*
+(512 x 512 x 60   | 1        | 1.64) Tj
+T*
+(512 x 512 x 65   | 1        | 1.64) Tj
+T*
+(512 x 512 x 67   | 1        | 1.64) Tj
+T*
+(512 x 512 x 77   | 1        | 1.64) Tj
+T*
+(512 x 512 x 80   | 1        | 1.64) Tj
+T*
+(512 x 512 x 83   | 1        | 1.64) Tj
+T*
+ET
+endstream
+endobj
+14 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 15 0 R >>
+endobj
+15 0 obj
+<< /Length 2589 >>
+stream
+BT
+/F1 9 Tf
+40 805 Td
+12 TL
+(512 x 512 x 86   | 1        | 1.64) Tj
+T*
+(512 x 512 x 87   | 1        | 1.64) Tj
+T*
+(512 x 512 x 88   | 1        | 1.64) Tj
+T*
+(512 x 512 x 90   | 1        | 1.64) Tj
+T*
+(512 x 512 x 92   | 1        | 1.64) Tj
+T*
+(512 x 512 x 93   | 1        | 1.64) Tj
+T*
+(512 x 512 x 95   | 1        | 1.64) Tj
+T*
+(512 x 512 x 97   | 1        | 1.64) Tj
+T*
+(512 x 512 x 99   | 1        | 1.64) Tj
+T*
+() Tj
+T*
+(Intensity) Tj
+T*
+(=========) Tj
+T*
+(Statistic          | Unit | Min      | Max      | Mean     | Median) Tj
+T*
+(------------------ | ---- | -------- | -------- | -------- | --------) Tj
+T*
+(Minimum intensity  | HU   | -1024    | -1024    | -1024    | -1024) Tj
+T*
+(Maximum intensity  | HU   | 1166     | 4154     | 2003.836 | 1616) Tj
+T*
+(Mean intensity     | HU   | -759.276 | -339.287 | -534.88  | -529.301) Tj
+T*
+(Standard deviation | HU   | 435.926  | 522.35   | 486.576  | 487.92) Tj
+T*
+(Percentile | Min   | Max   | Mean      | Median) Tj
+T*
+(---------- | ----- | ----- | --------- | ------) Tj
+T*
+(P0.5       | -1024 | -1024 | -1024     | -1024) Tj
+T*
+(P1         | -1024 | -1024 | -1024     | -1024) Tj
+T*
+(P5         | -1024 | -1002 | -1022.033 | -1024) Tj
+T*
+(P25        | -1024 | -942  | -1000.607 | -1001) Tj
+T*
+(P50        | -998  | -110  | -676.492  | -843) Tj
+T*
+(P75        | -844  | 31    | -57.59    | -46) Tj
+T*
+(P95        | 65    | 191   | 119.164   | 119) Tj
+T*
+(P99        | 178   | 521   | 316.738   | 313) Tj
+T*
+(P99.5      | 263   | 720   | 447.426   | 455) Tj
+T*
+(Total voxels: 1,383,333,888 voxels) Tj
+T*
+(Valid voxels: 1,383,333,888 voxels) Tj
+T*
+(Non-finite voxels: 0 voxels) Tj
+T*
+() Tj
+T*
+(Warnings) Tj
+T*
+(========) Tj
+T*
+(20 patient\(s\) have missing data.) Tj
+T*
+(Voxel spacing varies across CT images.) Tj
+T*
+(Slice thickness varies across CT images.) Tj
+T*
+(Volume dimensions are not consistent across CT images.) Tj
+T*
+() Tj
+T*
+(Preprocessing Recommendations) Tj
+T*
+(=============================) Tj
+T*
+(Severity | Category                | Recommendation) Tj
+T*
+(-------- | ----------------------- | ----------------------------------) Tj
+T*
+(high     | annotations             | Check missing labels or separate .) Tj
+T*
+(high     | spatial_resampling      | Resample CT images and labels to .) Tj
+T*
+(medium   | slice_thickness         | Standardize slice thickness or us.) Tj
+T*
+(medium   | shape_standardization   | Crop, pad, resize, or patch volum.) Tj
+T*
+(medium   | intensity_normalization | Apply CT intensity clipping and n.) Tj
+T*
+(info     | memory                  | Plan at least the estimated minim.) Tj
+T*
+ET
+endstream
+endobj
+xref
+0 16
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000148 00000 n 
+0000000218 00000 n 
+0000000344 00000 n 
+0000002679 00000 n 
+0000002805 00000 n 
+0000005019 00000 n 
+0000005145 00000 n 
+0000007867 00000 n 
+0000007995 00000 n 
+0000011091 00000 n 
+0000011219 00000 n 
+0000013953 00000 n 
+0000014081 00000 n 
+trailer
+<< /Size 16 /Root 1 0 R >>
+startxref
+16723
+%%EOF

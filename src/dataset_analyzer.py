@@ -20,6 +20,9 @@ from check_structure_dataset import DatasetStructure, identify_dataset_structure
 from nifti_analyzer import NiftiMetadata, PatientAnalysis, analyze_patient
 
 
+SPATIAL_ROUNDING_DIGITS = 3
+
+
 @dataclass
 class PatientWorkItem:
     """One image and optional label scheduled for patient-level analysis."""
@@ -121,6 +124,55 @@ class FrequencyItem:
 
 
 @dataclass
+class SliceThicknessFrequencyItem:
+    """Frequency of one slice thickness value for report tables."""
+
+    thickness_mm: float | None
+    count: int
+    percentage: float
+
+
+@dataclass
+class PercentileSummaryItem:
+    """Report-friendly intensity percentile summary."""
+
+    percentile: str
+    count: int
+    min: float | None
+    max: float | None
+    mean: float | None
+    median: float | None
+
+
+@dataclass
+class IntensityStatisticItem:
+    """Report-friendly intensity statistic summary table row."""
+
+    statistic: str
+    unit: str
+    count: int
+    min: float | None
+    max: float | None
+    mean: float | None
+    median: float | None
+
+
+@dataclass
+class VoxelValiditySummary:
+    """Readable summary of valid and invalid voxel counts."""
+
+    total_voxels: int
+    total_voxels_readable: str
+    valid_voxels: int
+    valid_voxels_readable: str
+    valid_voxel_percentage: float
+    non_finite_voxels: int
+    non_finite_voxels_readable: str
+    non_finite_voxel_percentage: float
+    explanation: str
+
+
+@dataclass
 class StorageEvaluation:
     """Estimated dataset storage size from detected image and label files."""
 
@@ -171,7 +223,7 @@ class ConsistencyEvaluation:
     in_plane_resolution_frequencies: list[FrequencyItem]
     most_common_slice_thickness: float | None
     percentage_same_thickness: float
-    slice_thickness_frequencies: list[FrequencyItem]
+    slice_thickness_frequencies: list[SliceThicknessFrequencyItem]
     most_common_voxel_spacing: list[float] | None
     percentage_same_voxel_spacing: float
     percentage_different_voxel_spacing: float
@@ -190,9 +242,14 @@ class IntensityEvaluation:
 
     global_min: float | None
     global_max: float | None
+    patient_min_summary: ValueSummary
+    patient_max_summary: ValueSummary
     patient_mean_summary: ValueSummary
     patient_std_summary: ValueSummary
+    patient_intensity_statistics_table: list[IntensityStatisticItem]
     patient_percentile_summaries: dict[str, ValueSummary]
+    patient_percentile_table: list[PercentileSummaryItem]
+    voxel_validity: VoxelValiditySummary
     finite_voxel_count: int
     non_finite_voxel_count: int
     non_finite_voxel_percentage: float
@@ -558,7 +615,7 @@ def _evaluate_consistency(image_metadata: list[NiftiMetadata]) -> ConsistencyEva
     slice_count_frequencies = _frequency_items(slice_counts)
     slice_count_thickness_frequencies = _frequency_items(slice_count_thicknesses)
     resolution_frequencies = _frequency_items(in_plane_resolutions)
-    thickness_frequencies = _frequency_items(slice_thicknesses)
+    thickness_frequencies = _slice_thickness_frequency_items(slice_thicknesses)
     spacing_frequencies = _frequency_items(voxel_spacings)
     physical_size_frequencies = _frequency_items(physical_sizes)
     dimension_frequencies = _frequency_items(dimensions)
@@ -584,7 +641,7 @@ def _evaluate_consistency(image_metadata: list[NiftiMetadata]) -> ConsistencyEva
         most_common_in_plane_resolution=_first_frequency_value(resolution_frequencies),
         percentage_same_resolution=_top_percentage(resolution_frequencies),
         in_plane_resolution_frequencies=resolution_frequencies,
-        most_common_slice_thickness=_first_frequency_value(thickness_frequencies),
+        most_common_slice_thickness=_first_slice_thickness_value(thickness_frequencies),
         percentage_same_thickness=_top_percentage(thickness_frequencies),
         slice_thickness_frequencies=thickness_frequencies,
         most_common_voxel_spacing=_first_frequency_value(spacing_frequencies),
@@ -610,14 +667,31 @@ def _evaluate_intensity(patients: list[PatientDatasetEntry]) -> IntensityEvaluat
     finite_max_values = [item.max for item in intensities if item.max is not None]
     patient_means = [item.mean for item in intensities if item.mean is not None]
     patient_stds = [item.std for item in intensities if item.std is not None]
+    patient_min_summary = _value_summary(finite_min_values)
+    patient_max_summary = _value_summary(finite_max_values)
+    patient_mean_summary = _value_summary(patient_means)
+    patient_std_summary = _value_summary(patient_stds)
     percentile_summaries = _summarize_patient_percentiles(intensities)
 
     return IntensityEvaluation(
         global_min=min(finite_min_values) if finite_min_values else None,
         global_max=max(finite_max_values) if finite_max_values else None,
-        patient_mean_summary=_value_summary(patient_means),
-        patient_std_summary=_value_summary(patient_stds),
+        patient_min_summary=patient_min_summary,
+        patient_max_summary=patient_max_summary,
+        patient_mean_summary=patient_mean_summary,
+        patient_std_summary=patient_std_summary,
+        patient_intensity_statistics_table=_intensity_statistics_table(
+            patient_min_summary=patient_min_summary,
+            patient_max_summary=patient_max_summary,
+            patient_mean_summary=patient_mean_summary,
+            patient_std_summary=patient_std_summary,
+        ),
         patient_percentile_summaries=percentile_summaries,
+        patient_percentile_table=_percentile_table(percentile_summaries),
+        voxel_validity=_voxel_validity_summary(
+            finite_voxel_count=finite_voxel_count,
+            non_finite_voxel_count=non_finite_voxel_count,
+        ),
         finite_voxel_count=finite_voxel_count,
         non_finite_voxel_count=non_finite_voxel_count,
         non_finite_voxel_percentage=_percentage(
@@ -684,6 +758,79 @@ def _summarize_patient_percentiles(
         percentile: _value_summary(values)
         for percentile, values in sorted(values_by_percentile.items())
     }
+
+
+def _percentile_table(
+    percentile_summaries: dict[str, ValueSummary],
+) -> list[PercentileSummaryItem]:
+    return [
+        PercentileSummaryItem(
+            percentile=_format_percentile_label(percentile),
+            count=summary.count,
+            min=summary.min,
+            max=summary.max,
+            mean=summary.mean,
+            median=summary.median,
+        )
+        for percentile, summary in sorted(
+            percentile_summaries.items(),
+            key=lambda item: _percentile_sort_value(item[0]),
+        )
+    ]
+
+
+def _intensity_statistics_table(
+    patient_min_summary: ValueSummary,
+    patient_max_summary: ValueSummary,
+    patient_mean_summary: ValueSummary,
+    patient_std_summary: ValueSummary,
+) -> list[IntensityStatisticItem]:
+    return [
+        _intensity_statistic_item("Minimum intensity", patient_min_summary),
+        _intensity_statistic_item("Maximum intensity", patient_max_summary),
+        _intensity_statistic_item("Mean intensity", patient_mean_summary),
+        _intensity_statistic_item("Standard deviation", patient_std_summary),
+    ]
+
+
+def _intensity_statistic_item(
+    statistic: str,
+    summary: ValueSummary,
+) -> IntensityStatisticItem:
+    return IntensityStatisticItem(
+        statistic=statistic,
+        unit="HU",
+        count=summary.count,
+        min=summary.min,
+        max=summary.max,
+        mean=summary.mean,
+        median=summary.median,
+    )
+
+
+def _voxel_validity_summary(
+    finite_voxel_count: int,
+    non_finite_voxel_count: int,
+) -> VoxelValiditySummary:
+    total_voxel_count = finite_voxel_count + non_finite_voxel_count
+    return VoxelValiditySummary(
+        total_voxels=total_voxel_count,
+        total_voxels_readable=_format_count(total_voxel_count, "voxels"),
+        valid_voxels=finite_voxel_count,
+        valid_voxels_readable=_format_count(finite_voxel_count, "voxels"),
+        valid_voxel_percentage=_percentage(finite_voxel_count, total_voxel_count),
+        non_finite_voxels=non_finite_voxel_count,
+        non_finite_voxels_readable=_format_count(non_finite_voxel_count, "voxels"),
+        non_finite_voxel_percentage=_percentage(
+            non_finite_voxel_count,
+            total_voxel_count,
+        ),
+        explanation=(
+            "Finite voxels are valid numeric CT intensity values. Non-finite "
+            "voxels are NaN or infinite values that should be cleaned before "
+            "training."
+        ),
+    )
 
 
 def _build_evaluation_warnings(
@@ -896,7 +1043,9 @@ def _build_report_preparation(
             "resolution",
             "dimensions",
             "intensity_statistics",
+            "intensity_statistics_table",
             "intensity_percentiles",
+            "voxel_validity",
             "warnings",
             "preprocessing_recommendations",
         ],
@@ -1013,7 +1162,29 @@ def _frequency_items(values: Iterable[Any]) -> list[FrequencyItem]:
     return sorted(items, key=lambda item: (-item.count, str(item.value)))
 
 
-def _top_percentage(frequencies: list[FrequencyItem]) -> float:
+def _slice_thickness_frequency_items(
+    values: Iterable[float | None],
+) -> list[SliceThicknessFrequencyItem]:
+    values_list = list(values)
+    if not values_list:
+        return []
+
+    total = len(values_list)
+    counter = Counter(values_list)
+    items = [
+        SliceThicknessFrequencyItem(
+            thickness_mm=value,
+            count=count,
+            percentage=round((count / total) * 100.0, 2),
+        )
+        for value, count in counter.items()
+    ]
+    return sorted(items, key=lambda item: (-item.count, item.thickness_mm or 0.0))
+
+
+def _top_percentage(
+    frequencies: list[FrequencyItem] | list[SliceThicknessFrequencyItem],
+) -> float:
     if not frequencies:
         return 0.0
     return frequencies[0].percentage
@@ -1025,11 +1196,22 @@ def _first_frequency_value(frequencies: list[FrequencyItem]) -> Any:
     return frequencies[0].value
 
 
-def _rounded_tuple(values: Iterable[float], digits: int = 6) -> tuple[float, ...]:
+def _first_slice_thickness_value(
+    frequencies: list[SliceThicknessFrequencyItem],
+) -> float | None:
+    if not frequencies:
+        return None
+    return frequencies[0].thickness_mm
+
+
+def _rounded_tuple(
+    values: Iterable[float],
+    digits: int = SPATIAL_ROUNDING_DIGITS,
+) -> tuple[float, ...]:
     return tuple(_rounded_float(value, digits) for value in values)
 
 
-def _rounded_float(value: float, digits: int = 6) -> float:
+def _rounded_float(value: float, digits: int = SPATIAL_ROUNDING_DIGITS) -> float:
     return round(float(value), digits)
 
 
@@ -1055,6 +1237,10 @@ def _format_bytes(value: int | float | None) -> str | None:
     return f"{size:.2f} {units[unit_index]}"
 
 
+def _format_count(value: int, unit: str) -> str:
+    return f"{value:,} {unit}"
+
+
 def _format_summary(analysis: DatasetAnalysis) -> str:
     counts = analysis.counts
     consistency = analysis.evaluation.consistency
@@ -1076,8 +1262,10 @@ def _format_summary(analysis: DatasetAnalysis) -> str:
         f"Estimated minimum memory needed: {memory.minimum_required_memory_readable}",
         f"Largest native volume memory: {memory.largest_native_volume_readable}",
         f"Intensity range: {intensity.global_min} to {intensity.global_max}",
-        f"Mean patient intensity: {intensity.patient_mean_summary.mean}",
-        f"Mean patient intensity std: {intensity.patient_std_summary.mean}",
+        f"Valid voxels: {intensity.voxel_validity.valid_voxels_readable} "
+        f"({intensity.voxel_validity.valid_voxel_percentage}%)",
+        f"Non-finite voxels: {intensity.voxel_validity.non_finite_voxels_readable} "
+        f"({intensity.voxel_validity.non_finite_voxel_percentage}%)",
         f"Same in-plane resolution: {consistency.percentage_same_resolution}%",
         f"Same slice count: {consistency.percentage_same_slice_count}%",
         f"Same slice thickness: {consistency.percentage_same_thickness}%",
@@ -1101,7 +1289,7 @@ def _format_summary(analysis: DatasetAnalysis) -> str:
         *_format_frequency_lines(consistency.in_plane_resolution_frequencies),
         "",
         "Slice thicknesses (Z mm):",
-        *_format_frequency_lines(consistency.slice_thickness_frequencies),
+        *_format_slice_thickness_lines(consistency.slice_thickness_frequencies),
         "",
         "Voxel spacings (X x Y x Z mm):",
         *_format_frequency_lines(consistency.voxel_spacing_frequencies),
@@ -1111,6 +1299,9 @@ def _format_summary(analysis: DatasetAnalysis) -> str:
         "",
         "Dimensions (voxels):",
         *_format_frequency_lines(consistency.dimension_frequencies),
+        "",
+        "Intensity statistics:",
+        *_format_intensity_statistics_lines(intensity.patient_intensity_statistics_table),
         "",
         "Intensity percentiles:",
         *_format_percentile_summary_lines(intensity.patient_percentile_summaries),
@@ -1143,9 +1334,41 @@ def _format_frequency_lines(frequencies: list[FrequencyItem]) -> list[str]:
     ]
 
 
+def _format_slice_thickness_lines(
+    frequencies: list[SliceThicknessFrequencyItem],
+) -> list[str]:
+    if not frequencies:
+        return ["- none"]
+    return [
+        f"- {_format_report_value(item.thickness_mm)} mm: "
+        f"{item.count} patient(s), {item.percentage}%"
+        for item in frequencies
+    ]
+
+
+def _format_intensity_statistics_lines(
+    statistics: list[IntensityStatisticItem],
+) -> list[str]:
+    if not statistics:
+        return ["- none"]
+    return [
+        f"- {item.statistic} ({item.unit}): min {item.min}, max {item.max}, "
+        f"mean {item.mean}, median {item.median}"
+        for item in statistics
+    ]
+
+
 def _format_frequency_value(value: Any) -> str:
     if isinstance(value, list):
-        return " x ".join(str(item) for item in value)
+        return " x ".join(_format_report_value(item) for item in value)
+    return _format_report_value(value)
+
+
+def _format_report_value(value: Any) -> str:
+    if value is None:
+        return "unknown"
+    if isinstance(value, float):
+        return f"{value:.3f}".rstrip("0").rstrip(".")
     return str(value)
 
 
@@ -1155,9 +1378,17 @@ def _format_percentile_summary_lines(
     if not percentile_summaries:
         return ["- none"]
     return [
-        f"- {percentile}: median {summary.median}, mean {summary.mean}"
-        for percentile, summary in percentile_summaries.items()
+        f"- {item.percentile}: median {item.median}, mean {item.mean}"
+        for item in _percentile_table(percentile_summaries)
     ]
+
+
+def _format_percentile_label(percentile_key: str) -> str:
+    return percentile_key.upper().replace("_", ".")
+
+
+def _percentile_sort_value(percentile_key: str) -> float:
+    return float(percentile_key.removeprefix("p").replace("_", "."))
 
 
 def main(argv: list[str] | None = None) -> int:

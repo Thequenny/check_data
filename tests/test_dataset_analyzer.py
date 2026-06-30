@@ -70,6 +70,16 @@ class DatasetAnalyzerTests(unittest.TestCase):
             self.assertEqual(analysis.evaluation.consistency.percentage_same_resolution, 100.0)
             self.assertEqual(analysis.evaluation.consistency.percentage_same_thickness, 50.0)
             self.assertEqual(analysis.evaluation.consistency.percentage_same_voxel_spacing, 50.0)
+            self.assertEqual(
+                analysis.evaluation.consistency.slice_thickness_frequencies[0].thickness_mm,
+                2.0,
+            )
+            self.assertFalse(
+                hasattr(
+                    analysis.evaluation.consistency.slice_thickness_frequencies[0],
+                    "display_value",
+                )
+            )
             self.assertFalse(analysis.evaluation.consistency.dimensions_are_consistent)
             self.assertEqual(
                 analysis.evaluation.memory.minimum_required_memory_readable,
@@ -89,6 +99,20 @@ class DatasetAnalyzerTests(unittest.TestCase):
             self.assertIn(
                 "p50",
                 analysis.evaluation.intensity.patient_percentile_summaries,
+            )
+            self.assertEqual(
+                analysis.evaluation.intensity.patient_percentile_table[0].percentile,
+                "P0.5",
+            )
+            intensity_statistics = {
+                item.statistic
+                for item in analysis.evaluation.intensity.patient_intensity_statistics_table
+            }
+            self.assertIn("Mean intensity", intensity_statistics)
+            self.assertIn("Standard deviation", intensity_statistics)
+            self.assertEqual(
+                analysis.evaluation.intensity.voxel_validity.valid_voxels_readable,
+                "20 voxels",
             )
             self.assertTrue(
                 analysis.evaluation.consistency.physical_size_frequencies
