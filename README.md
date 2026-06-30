@@ -1,8 +1,7 @@
 # check_data
 
 `check_data` analyzes NIfTI CT datasets before AI training. It summarizes the
-dataset structure, patient metadata, consistency issues, image/label alignment,
-CT intensity scale, and preprocessing considerations.
+dataset structure, patient metadata, consistency issues and preprocessing considerations.
 
 The project was tested with datasets from the Medical Segmentation Decathlon,
 including the Spleen and Heart tasks.
@@ -36,18 +35,6 @@ Install the dependencies with:
 
 ```powershell
 pip install numpy nibabel
-```
-
-## Project Structure
-
-```text
-src\check_structure_dataset.py   Step 0: dataset structure detection
-src\nifti_analyzer.py            Step 1: single-patient NIfTI analysis
-src\dataset_analyzer.py          Step 2: full dataset analysis
-data\report.py                   Step 3: HTML report generation
-data\analyse_dataset.json        Default dataset analysis output
-data\report.html                 Default HTML report output
-tests\                           Unit tests
 ```
 
 ## Usage
@@ -96,20 +83,6 @@ To analyze every detected split:
 ```powershell
 python src\dataset_analyzer.py dataset\Task09_Spleen --split all --output data\analyse_dataset.json
 ```
-
-The dataset analysis includes:
-
-- number of detected, analyzed, and failed patients
-- annotation coverage
-- storage size
-- minimum memory estimate
-- slice count and slice thickness distributions
-- voxel spacing and resolution distributions
-- dimension consistency checks
-- image/label alignment checks with patient IDs when misalignment is detected
-- CT intensity statistics
-- CT intensity scale checks with patient IDs when normalized data is suspected
-- warnings and preprocessing recommendations
 
 ### Step 3: Generate the HTML Report
 
