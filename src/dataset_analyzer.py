@@ -21,6 +21,7 @@ from nifti_analyzer import NiftiMetadata, PatientAnalysis, analyze_patient
 
 
 SPATIAL_ROUNDING_DIGITS = 3
+ALIGNMENT_TOLERANCE = 1e-3
 
 
 @dataclass
@@ -173,6 +174,64 @@ class VoxelValiditySummary:
 
 
 @dataclass
+class PatientIntensityScaleItem:
+    """Patient-level intensity scale classification."""
+
+    patient_id: str
+    split: str
+    image_path: str
+    min: float | None
+    max: float | None
+    mean: float | None
+    std: float | None
+    scale: str
+    reason: str
+
+
+@dataclass
+class IntensityScaleEvaluation:
+    """Detect whether CT images look like raw HU or normalized arrays."""
+
+    raw_hu_like_patient_count: int
+    normalized_patient_count: int
+    unknown_patient_count: int
+    normalized_patient_ids: list[str]
+    normalized_patients: list[PatientIntensityScaleItem]
+    unknown_patients: list[PatientIntensityScaleItem]
+    explanation: str
+
+
+@dataclass
+class LabelAlignmentIssue:
+    """One image/label pair that is not aligned on the same voxel grid."""
+
+    patient_id: str
+    split: str
+    image_path: str
+    label_path: str
+    issues: list[str]
+    image_dimensions: list[int]
+    label_dimensions: list[int]
+    image_voxel_spacing: list[float]
+    label_voxel_spacing: list[float]
+    image_orientation: list[str]
+    label_orientation: list[str]
+    affine_max_absolute_difference: float | None
+
+
+@dataclass
+class LabelAlignmentEvaluation:
+    """Dataset-level image/label alignment summary."""
+
+    checked_pairs: int
+    aligned_pairs: int
+    misaligned_pairs: int
+    alignment_percentage: float
+    misaligned_patients: list[LabelAlignmentIssue]
+    explanation: str
+
+
+@dataclass
 class StorageEvaluation:
     """Estimated dataset storage size from detected image and label files."""
 
@@ -250,6 +309,7 @@ class IntensityEvaluation:
     patient_percentile_summaries: dict[str, ValueSummary]
     patient_percentile_table: list[PercentileSummaryItem]
     voxel_validity: VoxelValiditySummary
+    intensity_scale: IntensityScaleEvaluation
     finite_voxel_count: int
     non_finite_voxel_count: int
     non_finite_voxel_percentage: float
@@ -272,6 +332,7 @@ class DatasetEvaluation:
     storage: StorageEvaluation
     memory: MemoryEvaluation
     consistency: ConsistencyEvaluation
+    alignment: LabelAlignmentEvaluation
     intensity: IntensityEvaluation
     missing_data: list[MissingDataItem]
     warnings: list[str]
@@ -338,9 +399,14 @@ class DatasetAnalysis:
 
 def analyze_dataset(
     dataset_root: str | Path,
-    split: str | None = None,
+    split: str | None = "train",
 ) -> DatasetAnalysis:
-    """Analyze all detected patients in a dataset folder."""
+    """Analyze detected patients in a dataset folder.
+
+    The default split is ``train`` because preprocessing checks are meant to
+    validate the data used for model training. Pass ``split=None`` to include
+    every detected split.
+    """
 
     root = Path(dataset_root).expanduser().resolve()
     structure = identify_dataset_structure(root)
@@ -378,7 +444,7 @@ def analyze_dataset(
             )
         )
 
-    counts = _build_counts(structure, work_items, patients, failed_patients)
+    counts = _build_counts(structure, work_items, patients, failed_patients, split)
     evaluation = evaluate_dataset(patients, failed_patients)
     report_preparation = _build_report_preparation(
         root=root,
@@ -417,6 +483,7 @@ def evaluate_dataset(
     storage = _evaluate_storage(image_metadata, label_metadata)
     memory = _evaluate_memory(image_metadata)
     consistency = _evaluate_consistency(image_metadata)
+    alignment = _evaluate_label_alignment(patients)
     intensity = _evaluate_intensity(patients)
     missing_data = _find_missing_data(patients, failed_patients)
     warnings = _build_evaluation_warnings(
@@ -424,6 +491,7 @@ def evaluate_dataset(
         failed_count=len(failed_patients),
         missing_data_count=len(missing_data),
         consistency=consistency,
+        alignment=alignment,
         intensity=intensity,
     )
     preprocessing_recommendations = _build_preprocessing_recommendations(
@@ -431,6 +499,7 @@ def evaluate_dataset(
         failed_patients=failed_patients,
         memory=memory,
         consistency=consistency,
+        alignment=alignment,
         intensity=intensity,
     )
 
@@ -438,6 +507,7 @@ def evaluate_dataset(
         storage=storage,
         memory=memory,
         consistency=consistency,
+        alignment=alignment,
         intensity=intensity,
         missing_data=missing_data,
         warnings=warnings,
@@ -499,20 +569,30 @@ def _build_counts(
     work_items: list[PatientWorkItem],
     patients: list[PatientDatasetEntry],
     failed_patients: list[FailedPatientAnalysis],
+    split: str | None,
 ) -> DatasetCounts:
     annotations_present = sum(1 for patient in patients if patient.label_path is not None)
     annotations_missing = len(patients) - annotations_present
+    image_files = _filter_split_items(structure.image_files, split)
+    label_files = _filter_split_items(structure.label_files, split)
+    image_label_pairs = _filter_split_items(structure.image_label_pairs, split)
 
     return DatasetCounts(
         patients_detected=len(work_items),
         patients_analyzed=len(patients),
         patients_failed=len(failed_patients),
-        image_files_detected=len(structure.image_files),
-        label_files_detected=len(structure.label_files),
-        image_label_pairs_detected=len(structure.image_label_pairs),
+        image_files_detected=len(image_files),
+        label_files_detected=len(label_files),
+        image_label_pairs_detected=len(image_label_pairs),
         annotations_present=annotations_present,
         annotations_missing=annotations_missing,
     )
+
+
+def _filter_split_items(items: Iterable[Any], split: str | None) -> list[Any]:
+    if split is None:
+        return list(items)
+    return [item for item in items if getattr(item, "split", None) == split]
 
 
 def _evaluate_storage(
@@ -657,6 +737,86 @@ def _evaluate_consistency(image_metadata: list[NiftiMetadata]) -> ConsistencyEva
     )
 
 
+def _evaluate_label_alignment(
+    patients: list[PatientDatasetEntry],
+) -> LabelAlignmentEvaluation:
+    checked_pairs = 0
+    misaligned_patients: list[LabelAlignmentIssue] = []
+
+    for patient in patients:
+        label_metadata = patient.analysis.annotation.metadata
+        if label_metadata is None:
+            continue
+
+        checked_pairs += 1
+        issue = _label_alignment_issue(
+            patient=patient,
+            image_metadata=patient.analysis.image.metadata,
+            label_metadata=label_metadata,
+        )
+        if issue is not None:
+            misaligned_patients.append(issue)
+
+    aligned_pairs = checked_pairs - len(misaligned_patients)
+    return LabelAlignmentEvaluation(
+        checked_pairs=checked_pairs,
+        aligned_pairs=aligned_pairs,
+        misaligned_pairs=len(misaligned_patients),
+        alignment_percentage=_percentage(aligned_pairs, checked_pairs),
+        misaligned_patients=misaligned_patients,
+        explanation=(
+            "Image and label are considered aligned when dimensions, voxel spacing, "
+            "orientation, and affine matrix match within a small numerical tolerance."
+        ),
+    )
+
+
+def _label_alignment_issue(
+    patient: PatientDatasetEntry,
+    image_metadata: NiftiMetadata,
+    label_metadata: NiftiMetadata,
+) -> LabelAlignmentIssue | None:
+    issues: list[str] = []
+
+    if image_metadata.dimensions != label_metadata.dimensions:
+        issues.append("dimensions")
+
+    if not _float_lists_close(
+        image_metadata.voxel_spacing,
+        label_metadata.voxel_spacing,
+        tolerance=ALIGNMENT_TOLERANCE,
+    ):
+        issues.append("voxel_spacing")
+
+    if image_metadata.orientation != label_metadata.orientation:
+        issues.append("orientation")
+
+    affine_difference = _matrix_max_absolute_difference(
+        image_metadata.affine,
+        label_metadata.affine,
+    )
+    if affine_difference is None or affine_difference > ALIGNMENT_TOLERANCE:
+        issues.append("affine")
+
+    if not issues:
+        return None
+
+    return LabelAlignmentIssue(
+        patient_id=patient.subject_id,
+        split=patient.split,
+        image_path=patient.image_path,
+        label_path=patient.label_path or "",
+        issues=issues,
+        image_dimensions=image_metadata.dimensions,
+        label_dimensions=label_metadata.dimensions,
+        image_voxel_spacing=image_metadata.voxel_spacing,
+        label_voxel_spacing=label_metadata.voxel_spacing,
+        image_orientation=image_metadata.orientation,
+        label_orientation=label_metadata.orientation,
+        affine_max_absolute_difference=affine_difference,
+    )
+
+
 def _evaluate_intensity(patients: list[PatientDatasetEntry]) -> IntensityEvaluation:
     intensities = [patient.analysis.image.intensity for patient in patients]
     finite_voxel_count = sum(item.finite_voxel_count for item in intensities)
@@ -692,6 +852,7 @@ def _evaluate_intensity(patients: list[PatientDatasetEntry]) -> IntensityEvaluat
             finite_voxel_count=finite_voxel_count,
             non_finite_voxel_count=non_finite_voxel_count,
         ),
+        intensity_scale=_evaluate_intensity_scale(patients),
         finite_voxel_count=finite_voxel_count,
         non_finite_voxel_count=non_finite_voxel_count,
         non_finite_voxel_percentage=_percentage(
@@ -833,11 +994,103 @@ def _voxel_validity_summary(
     )
 
 
+def _evaluate_intensity_scale(
+    patients: list[PatientDatasetEntry],
+) -> IntensityScaleEvaluation:
+    items = [_patient_intensity_scale(patient) for patient in patients]
+    normalized_patients = [item for item in items if item.scale == "normalized"]
+    unknown_patients = [item for item in items if item.scale == "unknown"]
+    raw_hu_like_patient_count = sum(1 for item in items if item.scale == "raw_hu")
+
+    return IntensityScaleEvaluation(
+        raw_hu_like_patient_count=raw_hu_like_patient_count,
+        normalized_patient_count=len(normalized_patients),
+        unknown_patient_count=len(unknown_patients),
+        normalized_patient_ids=[item.patient_id for item in normalized_patients],
+        normalized_patients=normalized_patients,
+        unknown_patients=unknown_patients,
+        explanation=(
+            "This is a heuristic check. Raw CT is expected to look compatible with "
+            "Hounsfield units. Volumes close to 0..1, -1..1, or centered around "
+            "0 with standard deviation near 1 are reported as suspected normalized."
+        ),
+    )
+
+
+def _patient_intensity_scale(patient: PatientDatasetEntry) -> PatientIntensityScaleItem:
+    intensity = patient.analysis.image.intensity
+    min_value = intensity.min
+    max_value = intensity.max
+    mean_value = intensity.mean
+    std_value = intensity.std
+
+    scale = "unknown"
+    reason = "Intensity range is not clearly raw HU or normalized."
+    if (
+        min_value is None
+        or max_value is None
+        or mean_value is None
+        or std_value is None
+    ):
+        reason = "No finite intensity values were available."
+    elif _looks_like_normalized_intensity(min_value, max_value, mean_value, std_value):
+        scale = "normalized"
+        reason = "Intensity values look already normalized."
+    elif _looks_like_raw_ct_hu(min_value, max_value):
+        scale = "raw_hu"
+        reason = "Intensity range is compatible with raw CT Hounsfield units."
+
+    return PatientIntensityScaleItem(
+        patient_id=patient.subject_id,
+        split=patient.split,
+        image_path=patient.image_path,
+        min=min_value,
+        max=max_value,
+        mean=mean_value,
+        std=std_value,
+        scale=scale,
+        reason=reason,
+    )
+
+
+def _looks_like_normalized_intensity(
+    min_value: float,
+    max_value: float,
+    mean_value: float,
+    std_value: float,
+) -> bool:
+    value_range = max_value - min_value
+    if value_range <= 0.01:
+        return False
+
+    if min_value >= -0.05 and max_value <= 1.05 and value_range >= 0.5:
+        return True
+    if min_value >= -1.1 and max_value <= 1.1 and value_range >= 1.0:
+        return True
+    return (
+        min_value >= -10.0
+        and max_value <= 10.0
+        and abs(mean_value) <= 0.25
+        and 0.5 <= std_value <= 2.0
+        and value_range >= 3.0
+    )
+
+
+def _looks_like_raw_ct_hu(min_value: float, max_value: float) -> bool:
+    value_range = max_value - min_value
+    if min_value <= -100.0 and max_value >= 100.0:
+        return True
+    if min_value <= -500.0 or max_value >= 1000.0:
+        return True
+    return value_range >= 500.0 and max_value > 100.0
+
+
 def _build_evaluation_warnings(
     patient_count: int,
     failed_count: int,
     missing_data_count: int,
     consistency: ConsistencyEvaluation,
+    alignment: LabelAlignmentEvaluation,
     intensity: IntensityEvaluation,
 ) -> list[str]:
     warnings: list[str] = []
@@ -855,8 +1108,17 @@ def _build_evaluation_warnings(
         warnings.append("Volume dimensions are not consistent across CT images.")
     if patient_count > 0 and consistency.percentage_same_orientation < 100.0:
         warnings.append("Image orientation varies across CT images.")
+    if alignment.misaligned_pairs:
+        warnings.append(
+            f"{alignment.misaligned_pairs} image/label pair(s) are not aligned."
+        )
     if patient_count > 0 and intensity.non_finite_voxel_count > 0:
         warnings.append("Some CT images contain non-finite intensity values.")
+    if intensity.intensity_scale.normalized_patient_count:
+        warnings.append(
+            "Some CT images appear already normalized instead of raw HU: "
+            + ", ".join(intensity.intensity_scale.normalized_patient_ids)
+        )
     return warnings
 
 
@@ -865,6 +1127,7 @@ def _build_preprocessing_recommendations(
     failed_patients: list[FailedPatientAnalysis],
     memory: MemoryEvaluation,
     consistency: ConsistencyEvaluation,
+    alignment: LabelAlignmentEvaluation,
     intensity: IntensityEvaluation,
 ) -> list[PreprocessingRecommendation]:
     recommendations: list[PreprocessingRecommendation] = []
@@ -946,6 +1209,19 @@ def _build_preprocessing_recommendations(
             )
         )
 
+    if alignment.misaligned_pairs:
+        patient_ids = ", ".join(
+            item.patient_id for item in alignment.misaligned_patients
+        )
+        recommendations.append(
+            PreprocessingRecommendation(
+                category="label_alignment",
+                severity="high",
+                message="Fix image/label alignment before model training.",
+                reason=f"Misaligned patient(s): {patient_ids}.",
+            )
+        )
+
     if intensity.non_finite_voxel_count:
         recommendations.append(
             PreprocessingRecommendation(
@@ -958,7 +1234,21 @@ def _build_preprocessing_recommendations(
             )
         )
 
-    if patients:
+    if intensity.intensity_scale.normalized_patient_count:
+        recommendations.append(
+            PreprocessingRecommendation(
+                category="intensity_scale",
+                severity="medium",
+                message="Confirm intensity scale before applying CT HU preprocessing.",
+                reason=(
+                    "Suspected normalized patient(s): "
+                    + ", ".join(intensity.intensity_scale.normalized_patient_ids)
+                    + "."
+                ),
+            )
+        )
+
+    if patients and not intensity.intensity_scale.normalized_patient_count:
         recommendations.append(
             PreprocessingRecommendation(
                 category="intensity_normalization",
@@ -1036,6 +1326,7 @@ def _build_report_preparation(
             "patient_counts",
             "missing_data",
             "task_detection",
+            "image_label_alignment",
             "memory_requirements",
             "slice_count_and_thickness",
             "voxel_spacing",
@@ -1045,6 +1336,7 @@ def _build_report_preparation(
             "intensity_statistics",
             "intensity_statistics_table",
             "intensity_percentiles",
+            "intensity_scale",
             "voxel_validity",
             "warnings",
             "preprocessing_recommendations",
@@ -1215,6 +1507,34 @@ def _rounded_float(value: float, digits: int = SPATIAL_ROUNDING_DIGITS) -> float
     return round(float(value), digits)
 
 
+def _float_lists_close(
+    first: list[float],
+    second: list[float],
+    tolerance: float,
+) -> bool:
+    if len(first) != len(second):
+        return False
+    return all(abs(float(left) - float(right)) <= tolerance for left, right in zip(first, second, strict=True))
+
+
+def _matrix_max_absolute_difference(
+    first: list[list[float]],
+    second: list[list[float]],
+) -> float | None:
+    if len(first) != len(second):
+        return None
+
+    max_difference = 0.0
+    for first_row, second_row in zip(first, second, strict=True):
+        if len(first_row) != len(second_row):
+            return None
+        for first_value, second_value in zip(first_row, second_row, strict=True):
+            difference = abs(float(first_value) - float(second_value))
+            if difference > max_difference:
+                max_difference = difference
+    return max_difference
+
+
 def _json_value(value: Any) -> Any:
     if isinstance(value, tuple):
         return [_json_value(item) for item in value]
@@ -1244,6 +1564,7 @@ def _format_count(value: int, unit: str) -> str:
 def _format_summary(analysis: DatasetAnalysis) -> str:
     counts = analysis.counts
     consistency = analysis.evaluation.consistency
+    alignment = analysis.evaluation.alignment
     storage = analysis.evaluation.storage
     memory = analysis.evaluation.memory
     intensity = analysis.evaluation.intensity
@@ -1272,6 +1593,10 @@ def _format_summary(analysis: DatasetAnalysis) -> str:
         f"Same voxel spacing: {consistency.percentage_same_voxel_spacing}%",
         f"Same dimensions: {consistency.percentage_same_dimensions}%",
         f"Same orientation: {consistency.percentage_same_orientation}%",
+        f"Aligned image/label pairs: {alignment.aligned_pairs}/{alignment.checked_pairs} "
+        f"({alignment.alignment_percentage}%)",
+        "Suspected normalized CT patients: "
+        f"{intensity.intensity_scale.normalized_patient_count}",
         "",
         "Image dimensionality:",
         *_format_frequency_lines(consistency.dimensionality_frequencies),
@@ -1303,9 +1628,26 @@ def _format_summary(analysis: DatasetAnalysis) -> str:
         "Intensity statistics:",
         *_format_intensity_statistics_lines(intensity.patient_intensity_statistics_table),
         "",
+        "Intensity scale:",
+        f"- Raw HU-like patients: {intensity.intensity_scale.raw_hu_like_patient_count}",
+        f"- Suspected normalized patients: {intensity.intensity_scale.normalized_patient_count}",
+        f"- Unknown intensity scale: {intensity.intensity_scale.unknown_patient_count}",
+        "",
         "Intensity percentiles:",
         *_format_percentile_summary_lines(intensity.patient_percentile_summaries),
     ]
+    if alignment.misaligned_patients:
+        lines.append("Misaligned image/label pairs:")
+        lines.extend(
+            f"- {item.patient_id}: {', '.join(item.issues)}"
+            for item in alignment.misaligned_patients
+        )
+    if intensity.intensity_scale.normalized_patients:
+        lines.append("Patients with suspected normalized intensity:")
+        lines.extend(
+            f"- {item.patient_id}: {item.reason}"
+            for item in intensity.intensity_scale.normalized_patients
+        )
     if analysis.evaluation.missing_data:
         lines.append("Missing data:")
         lines.extend(
@@ -1402,8 +1744,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--split",
-        choices=["train", "test", "validation", "unknown"],
-        help="Optional split filter. Example: --split train.",
+        choices=["train", "test", "validation", "unknown", "all"],
+        default="train",
+        help=(
+            "Split filter. Defaults to train. Use --split all to include every "
+            "detected split."
+        ),
     )
     parser.add_argument(
         "--json",
@@ -1412,7 +1758,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    analysis = analyze_dataset(args.dataset_root, split=args.split)
+    selected_split = None if args.split == "all" else args.split
+    analysis = analyze_dataset(args.dataset_root, split=selected_split)
     if args.output:
         save_dataset_analysis(analysis, args.output)
     elif args.json:

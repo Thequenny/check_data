@@ -1,25 +1,29 @@
 # check_data
 
-This program analyzes NIfTI CT datasets before AI training. It is designed to
-summarize dataset structure, patient metadata, consistency issues and preprocessing considerations.
-For testing, I used the Spleen dataset from the `Medical Segmentation Decathlon`.
+`check_data` analyzes NIfTI CT datasets before AI training. It summarizes the
+dataset structure, patient metadata, consistency issues, image/label alignment,
+CT intensity scale, and preprocessing considerations.
 
+The project was tested with datasets from the Medical Segmentation Decathlon,
+including the Spleen and Heart tasks.
 
 ## Features
 
-- Detect image and label folders, including non-standard names containing
-  `image` or `label`.
-- Identify image/label relationships.
-- Infer whether a dataset is likely segmentation or classification.
+- Detect image and label folders, including non-standard folder names that
+  contain `image` or `label`.
+- Identify image/label relationships and missing annotations.
+- Infer whether the dataset is likely segmentation, classification, or unknown.
 - Read `.nii` and `.nii.gz` files with `nibabel`.
-- Extract dimensions, voxel spacing, orientation, datatype, affine matrix, and
-  memory estimates.
+- Extract dimensions, voxel spacing, orientation, datatype, affine matrix,
+  physical size, storage size, and memory estimates.
 - Compute patient-level CT intensity statistics.
-- Analyze all detected patients in a dataset.
+- Analyze the training split by default to avoid mixing test data into the
+  training data quality report.
 - Compare voxel spacing, slice thickness, resolution, dimensions, and
   orientation across patients.
-- Generate JSON outputs for later report generation.
-
+- Check whether image and label volumes are aligned for each patient.
+- Detect CT images that look already normalized instead of raw Hounsfield units.
+- Generate JSON outputs and an HTML report.
 
 ## Requirements
 
@@ -28,10 +32,22 @@ The code uses Python and requires:
 - `numpy`
 - `nibabel`
 
-Install them with:
+Install the dependencies with:
 
 ```powershell
 pip install numpy nibabel
+```
+
+## Project Structure
+
+```text
+src\check_structure_dataset.py   Step 0: dataset structure detection
+src\nifti_analyzer.py            Step 1: single-patient NIfTI analysis
+src\dataset_analyzer.py          Step 2: full dataset analysis
+data\report.py                   Step 3: HTML report generation
+data\analyse_dataset.json        Default dataset analysis output
+data\report.html                 Default HTML report output
+tests\                           Unit tests
 ```
 
 ## Usage
@@ -42,7 +58,7 @@ pip install numpy nibabel
 python src\check_structure_dataset.py dataset\Task09_Spleen
 ```
 
-To print the full structure as JSON:
+To print the full detected structure as JSON:
 
 ```powershell
 python src\check_structure_dataset.py dataset\Task09_Spleen --json
@@ -54,7 +70,11 @@ python src\check_structure_dataset.py dataset\Task09_Spleen --json
 python src\nifti_analyzer.py dataset\Task09_Spleen\imagesTr\spleen_10.nii.gz --label dataset\Task09_Spleen\labelsTr\spleen_10.nii.gz --output data\CT_syntesis.json
 ```
 
-This stores patient-level metadata and intensity statistics in JSON format.
+This stores patient-level metadata and intensity statistics in:
+
+```text
+data\CT_syntesis.json
+```
 
 ### Step 2: Analyze a Full Dataset
 
@@ -62,23 +82,73 @@ This stores patient-level metadata and intensity statistics in JSON format.
 python src\dataset_analyzer.py dataset\Task09_Spleen --output data\analyse_dataset.json
 ```
 
-To analyze only one split:
+By default, the dataset analyzer uses the `train` split only. This avoids
+counting unlabeled test cases as missing training labels.
+
+To choose a specific split:
 
 ```powershell
-python src\dataset_analyzer.py dataset\Task09_Spleen --split train
+python src\dataset_analyzer.py dataset\Task09_Spleen --split train --output data\analyse_dataset.json
+```
+
+To analyze every detected split:
+
+```powershell
+python src\dataset_analyzer.py dataset\Task09_Spleen --split all --output data\analyse_dataset.json
 ```
 
 The dataset analysis includes:
 
 - number of detected, analyzed, and failed patients
 - annotation coverage
-- storage size 
+- storage size
 - minimum memory estimate
 - slice count and slice thickness distributions
 - voxel spacing and resolution distributions
 - dimension consistency checks
-- intensity statistics
+- image/label alignment checks with patient IDs when misalignment is detected
+- CT intensity statistics
+- CT intensity scale checks with patient IDs when normalized data is suspected
 - warnings and preprocessing recommendations
+
+### Step 3: Generate the HTML Report
+
+Generate the report from the default dataset analysis JSON:
+
+```powershell
+python data\report.py --input data\analyse_dataset.json --html data\report.html
+```
+
+Open the generated report:
+
+```powershell
+start data\report.html
+```
+
+The report contains:
+
+- dataset overview
+- patients information
+- task detection
+- missing data
+- image/label alignment
+- slice count and slice thickness
+- voxel size
+- patient intensity summary
+- CT intensity scale check
+- voxel validity
+- consistency statistics
+- warnings
+- preprocessing recommendations
+
+## Example Workflow
+
+```powershell
+python src\check_structure_dataset.py dataset\Task02_Heart
+python src\dataset_analyzer.py dataset\Task02_Heart --output data\analyse_dataset.json
+python data\report.py --input data\analyse_dataset.json --html data\report.html
+start data\report.html
+```
 
 ## Tests
 
@@ -88,6 +158,5 @@ Run all tests with:
 python -m unittest discover -s tests -v
 ```
 
-The tests generate small temporary NIfTI files, so they do not require the full
-example dataset.
-
+The tests generate small temporary NIfTI files, so they do not require a full
+medical imaging dataset.

@@ -1,8 +1,7 @@
-"""Generate HTML and PDF reports from data/analyse_dataset.json.
+"""Generate an HTML report from data/analyse_dataset.json.
 
-The report is intentionally dependency-free. The HTML report contains the full
-tables. The PDF report is a plain text/table rendering written with a minimal
-PDF writer from the Python standard library.
+The report is intentionally dependency-free and focuses on medical dataset
+quality information useful before AI training.
 """
 
 from __future__ import annotations
@@ -24,19 +23,20 @@ DEFAULT_PDF_OUTPUT = Path(__file__).resolve().parent / "report.pdf"
 def generate_reports(
     input_path: str | Path = DEFAULT_INPUT,
     html_output_path: str | Path = DEFAULT_HTML_OUTPUT,
-    pdf_output_path: str | Path = DEFAULT_PDF_OUTPUT,
+    pdf_output_path: str | Path | None = None,
 ) -> None:
     analysis = _load_json(input_path)
     html_report = _build_html_report(analysis)
-    pdf_lines = _build_text_report(analysis)
 
     html_destination = Path(html_output_path).expanduser().resolve()
-    pdf_destination = Path(pdf_output_path).expanduser().resolve()
     html_destination.parent.mkdir(parents=True, exist_ok=True)
-    pdf_destination.parent.mkdir(parents=True, exist_ok=True)
-
     html_destination.write_text(html_report, encoding="utf-8")
-    _write_pdf(pdf_destination, pdf_lines)
+
+    if pdf_output_path is not None:
+        pdf_lines = _build_text_report(analysis)
+        pdf_destination = Path(pdf_output_path).expanduser().resolve()
+        pdf_destination.parent.mkdir(parents=True, exist_ok=True)
+        _write_pdf(pdf_destination, pdf_lines)
 
 
 def _load_json(path: str | Path) -> dict[str, Any]:
@@ -51,9 +51,9 @@ def _build_html_report(analysis: dict[str, Any]) -> str:
     counts = analysis["counts"]
     evaluation = analysis["evaluation"]
     consistency = evaluation["consistency"]
+    alignment = evaluation["alignment"]
     intensity = evaluation["intensity"]
-    storage = evaluation["storage"]
-    memory = evaluation["memory"]
+    intensity_scale = intensity["intensity_scale"]
 
     generated_at = datetime.now().strftime("%Y-%m-%d %H:%M")
     sections = [
@@ -64,25 +64,26 @@ def _build_html_report(analysis: dict[str, Any]) -> str:
                 ["Field", "Value"],
                 [
                     ["Dataset name", overview["dataset_name"]],
-                    ["Dataset root", overview["dataset_root"]],
                     ["Split", overview["split_filter"]],
                     ["Task type", overview["task_type"]],
                     ["Task reason", overview["task_reason"]],
-                    ["Total storage", overview["total_storage"]],
                     ["Minimum memory needed", overview["minimum_memory_needed"]],
                 ],
                 class_name="kv",
             ),
         ),
         _section(
-            "Patient Counts",
+            "Patients Information",
             _table(
                 ["Metric", "Value"],
                 [
-                    ["Patients detected", counts["patients_detected"]],
-                    ["Patients analysed", counts["patients_analyzed"]],
-                    ["Failed analyses", counts["patients_failed"]],
-                    ["Patients with missing data", len(evaluation["missing_data"])],
+                    ["Number of patients", counts["patients_detected"]],
+                    ["Number of analysed patients", counts["patients_analyzed"]],
+                    ["Number of failed analyses", counts["patients_failed"]],
+                    [
+                        "Number of patients with missing data",
+                        len(evaluation["missing_data"]),
+                    ],
                     ["Annotations present", counts["annotations_present"]],
                     ["Annotations missing", counts["annotations_missing"]],
                     ["Analysis success", f"{overview['analysis_success_percentage']}%"],
@@ -110,77 +111,46 @@ def _build_html_report(analysis: dict[str, Any]) -> str:
         ),
         _section("Missing Data", _missing_data_table(evaluation["missing_data"])),
         _section(
-            "Memory and Storage",
-            _table(
-                ["Metric", "Value"],
+            "Image/Label Alignment",
+            _dict_table(
                 [
-                    ["Total file size", storage["total_file_size_readable"]],
-                    ["Images storage", storage["image_file_size_readable"]],
-                    ["Labels storage", storage["label_file_size_readable"]],
-                    [
-                        "Minimum memory needed",
-                        memory["minimum_required_memory_readable"],
-                    ],
-                    [
-                        "Minimum memory basis",
-                        memory["minimum_required_memory_basis"],
-                    ],
-                    [
-                        "Largest native volume memory",
-                        memory["largest_native_volume_readable"],
-                    ],
-                    [
-                        "Largest float32 volume memory",
-                        memory["largest_float32_volume_readable"],
-                    ],
-                ],
-                class_name="kv",
+                    ["Checked image/label pairs", alignment["checked_pairs"]],
+                    ["Aligned pairs", alignment["aligned_pairs"]],
+                    ["Misaligned pairs", alignment["misaligned_pairs"]],
+                    ["Alignment", f"{alignment['alignment_percentage']}%"],
+                    ["Explanation", alignment["explanation"]],
+                ]
+            )
+            + _subsection(
+                "Misaligned Patients",
+                _misaligned_patients_table(alignment["misaligned_patients"]),
             ),
         ),
         _section(
             "Slice Count and Thickness",
             _subsection("Dimensionality", _frequency_table(consistency["dimensionality_frequencies"]))
-            + _subsection("Slice Counts", _frequency_table(consistency["slice_count_frequencies"]))
             + _subsection(
-                "Slice Thickness",
-                _slice_thickness_table(consistency["slice_thickness_frequencies"]),
+                "Slices data",
+                _slice_number_thickness_table(
+                    consistency["slice_count_thickness_frequencies"]
+                ),
             )
-            + _subsection(
-                "Slice Count + Thickness",
-                _frequency_table(consistency["slice_count_thickness_frequencies"]),
-            ),
         ),
         _section(
-            "Voxel Size, Resolution, and Volume",
+            "Voxel Size",
             _subsection(
-                "In-plane Resolution (X x Y mm)",
-                _frequency_table(consistency["in_plane_resolution_frequencies"]),
-            )
-            + _subsection(
-                "Voxel Size / Spacing (X x Y x Z mm)",
+                "Voxel Size (X x Y x Z mm)",
                 _frequency_table(consistency["voxel_spacing_frequencies"]),
-            )
-            + _subsection(
-                "Voxel Volume (mm3)",
-                _value_summary_table(consistency["voxel_volume_mm3_summary"]),
-            )
-            + _subsection(
-                "Physical Volume Size (X x Y x Z mm)",
-                _frequency_table(consistency["physical_size_frequencies"]),
-            )
-            + _subsection(
-                "Image Dimensions (X x Y x Z voxels)",
-                _frequency_table(consistency["dimension_frequencies"]),
             ),
         ),
         _section(
             "Intensity Statistics",
             _subsection(
                 "Patient Intensity Summary",
-                _dict_table(
+                _global_intensity_table(
                     [
-                        ["Global minimum", intensity["global_min"]],
-                        ["Global maximum", intensity["global_max"]],
+                        ["Global minimum", "HU", intensity["global_min"]],
+                        ["Global maximum", "HU", intensity["global_max"]],
                     ]
                 )
                 + _intensity_statistics_table(
@@ -188,8 +158,33 @@ def _build_html_report(analysis: dict[str, Any]) -> str:
                 ),
             )
             + _subsection(
-                "Percentiles",
-                _percentile_table(intensity["patient_percentile_table"]),
+                "Intensity Scale Check",
+                _dict_table(
+                    [
+                        [
+                            "Raw HU-like patients",
+                            intensity_scale["raw_hu_like_patient_count"],
+                        ],
+                        [
+                            "Suspected normalized patients",
+                            intensity_scale["normalized_patient_count"],
+                        ],
+                        [
+                            "Unknown intensity scale",
+                            intensity_scale["unknown_patient_count"],
+                        ],
+                        [
+                            "Suspected normalized patient IDs",
+                            _format_patient_ids(
+                                intensity_scale["normalized_patient_ids"]
+                            ),
+                        ],
+                        ["Explanation", intensity_scale["explanation"]],
+                    ]
+                )
+                + _normalized_patients_table(
+                    intensity_scale["normalized_patients"]
+                ),
             )
             + _subsection(
                 "Voxel Validity",
@@ -197,16 +192,18 @@ def _build_html_report(analysis: dict[str, Any]) -> str:
                     [
                         [
                             "Total voxels",
-                            intensity["voxel_validity"]["total_voxels_readable"],
+                            _format_voxel_count_text(
+                                intensity["voxel_validity"]["total_voxels_readable"]
+                            ),
                         ],
                         [
                             "Valid voxels",
-                            f"{intensity['voxel_validity']['valid_voxels_readable']} "
+                            f"{_format_voxel_count_text(intensity['voxel_validity']['valid_voxels_readable'])} "
                             f"({intensity['voxel_validity']['valid_voxel_percentage']}%)",
                         ],
                         [
                             "Non-finite voxels",
-                            f"{intensity['voxel_validity']['non_finite_voxels_readable']} "
+                            f"{_format_voxel_count_text(intensity['voxel_validity']['non_finite_voxels_readable'])} "
                             f"({intensity['voxel_validity']['non_finite_voxel_percentage']}%)",
                         ],
                         ["Explanation", intensity["voxel_validity"]["explanation"]],
@@ -403,7 +400,7 @@ def _value_summary_table(summary: dict[str, Any]) -> str:
 
 def _frequency_table(items: list[dict[str, Any]]) -> str:
     return _table(
-        ["Value", "Patients", "Percentage"],
+        ["Value", "Number of patients", "Percentage"],
         (
             [item.get("display_value", item.get("value")), item["count"], f"{item['percentage']}%"]
             for item in items
@@ -413,9 +410,24 @@ def _frequency_table(items: list[dict[str, Any]]) -> str:
 
 def _slice_thickness_table(items: list[dict[str, Any]]) -> str:
     return _table(
-        ["Thickness (mm)", "Patients", "Percentage"],
+        ["Thickness (mm)", "Number of patients", "Percentage"],
         (
             [item["thickness_mm"], item["count"], f"{item['percentage']}%"]
+            for item in items
+        ),
+    )
+
+
+def _slice_number_thickness_table(items: list[dict[str, Any]]) -> str:
+    return _table(
+        ["Number of slices", "Slice thickness (mm)", "Number of patients", "Percentage"],
+        (
+            [
+                item["value"][0],
+                item["value"][1],
+                item["count"],
+                f"{item['percentage']}%",
+            ]
             for item in items
         ),
     )
@@ -428,7 +440,7 @@ def _missing_data_table(items: list[dict[str, Any]]) -> str:
             [
                 item["patient_id"],
                 item["split"],
-                ", ".join(item["missing_fields"]),
+                _format_missing_fields(item["missing_fields"]),
                 item["image_path"],
                 item["label_path"] or "Not available",
                 item["reason"],
@@ -438,9 +450,37 @@ def _missing_data_table(items: list[dict[str, Any]]) -> str:
     )
 
 
+def _misaligned_patients_table(items: list[dict[str, Any]]) -> str:
+    return _table(
+        [
+            "Patient ID",
+            "Split",
+            "Issues",
+            "Image dimensions",
+            "Label dimensions",
+            "Image voxel spacing",
+            "Label voxel spacing",
+            "Affine max difference",
+        ],
+        (
+            [
+                item["patient_id"],
+                item["split"],
+                _format_label_list(item["issues"]),
+                item["image_dimensions"],
+                item["label_dimensions"],
+                item["image_voxel_spacing"],
+                item["label_voxel_spacing"],
+                item["affine_max_absolute_difference"],
+            ]
+            for item in items
+        ),
+    )
+
+
 def _intensity_statistics_table(items: list[dict[str, Any]]) -> str:
     return _table(
-        ["Statistic", "Unit", "Patients", "Minimum", "Maximum", "Mean", "Median"],
+        ["Statistic", "Unit", "Number of patients", "Minimum", "Maximum", "Mean", "Median"],
         (
             [
                 item["statistic"],
@@ -456,9 +496,31 @@ def _intensity_statistics_table(items: list[dict[str, Any]]) -> str:
     )
 
 
+def _global_intensity_table(rows: Iterable[Iterable[Any]]) -> str:
+    return _table(["Statistic", "Unit", "Value"], rows)
+
+
+def _normalized_patients_table(items: list[dict[str, Any]]) -> str:
+    return _table(
+        ["Patient ID", "Split", "Minimum", "Maximum", "Mean", "Std", "Reason"],
+        (
+            [
+                item["patient_id"],
+                item["split"],
+                item["min"],
+                item["max"],
+                item["mean"],
+                item["std"],
+                item["reason"],
+            ]
+            for item in items
+        ),
+    )
+
+
 def _percentile_table(items: list[dict[str, Any]]) -> str:
     return _table(
-        ["Percentile", "Patients", "Minimum", "Maximum", "Mean", "Median"],
+        ["Percentile", "Number of patients", "Minimum", "Maximum", "Mean", "Median"],
         (
             [
                 item["percentile"],
@@ -479,7 +541,7 @@ def _recommendations_table(items: list[dict[str, Any]]) -> str:
         (
             [
                 item["severity"],
-                item["category"],
+                _format_label(item["category"]),
                 item["message"],
                 item["reason"],
             ]
@@ -500,8 +562,9 @@ def _build_text_report(analysis: dict[str, Any]) -> list[str]:
     counts = analysis["counts"]
     evaluation = analysis["evaluation"]
     consistency = evaluation["consistency"]
+    alignment = evaluation["alignment"]
     intensity = evaluation["intensity"]
-    memory = evaluation["memory"]
+    intensity_scale = intensity["intensity_scale"]
 
     lines: list[str] = []
     _add_title(lines, "Medical Imaging Dataset Analysis Report")
@@ -518,13 +581,14 @@ def _build_text_report(analysis: dict[str, Any]) -> list[str]:
     _add_key_values(
         lines,
         [
-            ("Dataset root", overview["dataset_root"]),
             ("Split", overview["split_filter"]),
-            ("Patients detected", counts["patients_detected"]),
-            ("Patients analysed", counts["patients_analyzed"]),
-            ("Failed analyses", counts["patients_failed"]),
-            ("Patients with missing data", len(evaluation["missing_data"])),
-            ("Total storage", overview["total_storage"]),
+            ("Number of patients", counts["patients_detected"]),
+            ("Number of analysed patients", counts["patients_analyzed"]),
+            ("Number of failed analyses", counts["patients_failed"]),
+            (
+                "Number of patients with missing data",
+                len(evaluation["missing_data"]),
+            ),
             ("Minimum memory", overview["minimum_memory_needed"]),
         ],
     )
@@ -549,68 +613,96 @@ def _build_text_report(analysis: dict[str, Any]) -> list[str]:
             [
                 item["patient_id"],
                 item["split"],
-                ", ".join(item["missing_fields"]),
+                _format_missing_fields(item["missing_fields"]),
             ]
             for item in evaluation["missing_data"]
         ),
     )
 
-    _add_title(lines, "Memory")
+    _add_title(lines, "Image/Label Alignment")
     _add_key_values(
         lines,
         [
-            ("Minimum memory needed", memory["minimum_required_memory_readable"]),
-            ("Basis", memory["minimum_required_memory_basis"]),
-            ("Largest native volume", memory["largest_native_volume_readable"]),
-            ("Largest float32 volume", memory["largest_float32_volume_readable"]),
+            ("Checked image/label pairs", alignment["checked_pairs"]),
+            ("Aligned pairs", alignment["aligned_pairs"]),
+            ("Misaligned pairs", alignment["misaligned_pairs"]),
+            ("Alignment", f"{alignment['alignment_percentage']}%"),
         ],
     )
-
-    _add_title(lines, "Slices")
     _add_table_lines(
         lines,
-        ["Dimensionality", "Patients", "%"],
+        ["Patient ID", "Split", "Issues"],
+        (
+            [
+                item["patient_id"],
+                item["split"],
+                _format_label_list(item["issues"]),
+            ]
+            for item in alignment["misaligned_patients"]
+        ),
+    )
+
+    _add_title(lines, "Slices data")
+    _add_table_lines(
+        lines,
+        ["Dimensionality", "Number of patients", "%"],
         _frequency_text_rows(consistency["dimensionality_frequencies"]),
     )
     _add_table_lines(
         lines,
-        ["Slice count", "Patients", "%"],
-        _frequency_text_rows(consistency["slice_count_frequencies"]),
-    )
-    _add_table_lines(
-        lines,
-        ["Thickness (mm)", "Patients", "%"],
+        ["Number of slices", "Slice thickness (mm)", "Number of patients", "%"],
         (
-            [item["thickness_mm"], item["count"], item["percentage"]]
-            for item in consistency["slice_thickness_frequencies"]
+            [item["value"][0], item["value"][1], item["count"], item["percentage"]]
+            for item in consistency["slice_count_thickness_frequencies"]
         ),
     )
 
-    _add_title(lines, "Voxel Size and Volume")
+    _add_title(lines, "Voxel Size")
     _add_table_lines(
         lines,
-        ["Voxel size XxYxZ (mm)", "Patients", "%"],
+        ["Voxel size XxYxZ (mm)", "Number of patients", "%"],
         _frequency_text_rows(consistency["voxel_spacing_frequencies"]),
-    )
-    _add_table_lines(
-        lines,
-        ["Physical volume XxYxZ (mm)", "Patients", "%"],
-        _frequency_text_rows(consistency["physical_size_frequencies"]),
-    )
-    _add_table_lines(
-        lines,
-        ["Dimensions XxYxZ", "Patients", "%"],
-        _frequency_text_rows(consistency["dimension_frequencies"]),
     )
 
     _add_title(lines, "Intensity")
+    _add_key_values(
+        lines,
+        [
+            ("Raw HU-like patients", intensity_scale["raw_hu_like_patient_count"]),
+            (
+                "Suspected normalized patients",
+                intensity_scale["normalized_patient_count"],
+            ),
+            ("Unknown intensity scale", intensity_scale["unknown_patient_count"]),
+            (
+                "Suspected normalized patient IDs",
+                _format_patient_ids(intensity_scale["normalized_patient_ids"]),
+            ),
+        ],
+    )
     _add_table_lines(
         lines,
-        ["Statistic", "Unit", "Min", "Max", "Mean", "Median"],
+        ["Patient ID", "Split", "Min", "Max", "Mean", "Std"],
+        (
+            [
+                item["patient_id"],
+                item["split"],
+                item["min"],
+                item["max"],
+                item["mean"],
+                item["std"],
+            ]
+            for item in intensity_scale["normalized_patients"]
+        ),
+    )
+    _add_table_lines(
+        lines,
+        ["Statistic", "Unit", "Number of patients", "Min", "Max", "Mean", "Median"],
         (
             [
                 item["statistic"],
                 item["unit"],
+                item["count"],
                 item["min"],
                 item["max"],
                 item["mean"],
@@ -619,28 +711,26 @@ def _build_text_report(analysis: dict[str, Any]) -> list[str]:
             for item in intensity["patient_intensity_statistics_table"]
         ),
     )
-    _add_table_lines(
-        lines,
-        ["Percentile", "Min", "Max", "Mean", "Median"],
-        (
-            [
-                item["percentile"],
-                item["min"],
-                item["max"],
-                item["mean"],
-                item["median"],
-            ]
-            for item in intensity["patient_percentile_table"]
-        ),
-    )
     _add_key_values(
         lines,
         [
-            ("Total voxels", intensity["voxel_validity"]["total_voxels_readable"]),
-            ("Valid voxels", intensity["voxel_validity"]["valid_voxels_readable"]),
+            (
+                "Total voxels",
+                _format_voxel_count_text(
+                    intensity["voxel_validity"]["total_voxels_readable"]
+                ),
+            ),
+            (
+                "Valid voxels",
+                _format_voxel_count_text(
+                    intensity["voxel_validity"]["valid_voxels_readable"]
+                ),
+            ),
             (
                 "Non-finite voxels",
-                intensity["voxel_validity"]["non_finite_voxels_readable"],
+                _format_voxel_count_text(
+                    intensity["voxel_validity"]["non_finite_voxels_readable"]
+                ),
             ),
         ],
     )
@@ -653,7 +743,7 @@ def _build_text_report(analysis: dict[str, Any]) -> list[str]:
         lines,
         ["Severity", "Category", "Recommendation"],
         (
-            [item["severity"], item["category"], item["message"]]
+            [item["severity"], _format_label(item["category"]), item["message"]]
             for item in evaluation["preprocessing_recommendations"]
         ),
     )
@@ -664,6 +754,28 @@ def _build_text_report(analysis: dict[str, Any]) -> list[str]:
 def _frequency_text_rows(items: list[dict[str, Any]]) -> Iterable[list[Any]]:
     for item in items:
         yield [item.get("display_value", item.get("value")), item["count"], item["percentage"]]
+
+
+def _format_missing_fields(fields: list[str]) -> str:
+    return ", ".join(field.replace("_", " ") for field in fields)
+
+
+def _format_label_list(values: list[str]) -> str:
+    return ", ".join(_format_label(value) for value in values)
+
+
+def _format_patient_ids(values: list[str]) -> str:
+    if not values:
+        return "None"
+    return ", ".join(values)
+
+
+def _format_label(value: str) -> str:
+    return value.replace("_", " ")
+
+
+def _format_voxel_count_text(value: str) -> str:
+    return value.replace(",", ".")
 
 
 def _add_title(lines: list[str], title: str) -> None:
@@ -842,14 +954,15 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--pdf",
-        default=str(DEFAULT_PDF_OUTPUT),
-        help="Output PDF report path.",
+        default=None,
+        help="Optional output PDF report path.",
     )
     args = parser.parse_args(argv)
 
     generate_reports(args.input, args.html, args.pdf)
     print(f"HTML report written to: {Path(args.html).resolve()}")
-    print(f"PDF report written to: {Path(args.pdf).resolve()}")
+    if args.pdf is not None:
+        print(f"PDF report written to: {Path(args.pdf).resolve()}")
     return 0
 
 

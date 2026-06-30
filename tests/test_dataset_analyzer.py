@@ -32,6 +32,32 @@ def write_nifti(
 
 
 class DatasetAnalyzerTests(unittest.TestCase):
+    def test_default_dataset_analysis_uses_train_split_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write_nifti(
+                root / "imagesTr" / "patient_train.nii.gz",
+                np.zeros((2, 2, 2), dtype=np.float32),
+            )
+            write_nifti(
+                root / "labelsTr" / "patient_train.nii.gz",
+                np.ones((2, 2, 2), dtype=np.uint8),
+            )
+            write_nifti(
+                root / "imagesTs" / "patient_test.nii.gz",
+                np.zeros((2, 2, 2), dtype=np.float32),
+            )
+
+            analysis = analyze_dataset(root)
+
+            self.assertEqual(analysis.split_filter, "train")
+            self.assertEqual(analysis.counts.patients_detected, 1)
+            self.assertEqual(analysis.counts.patients_analyzed, 1)
+            self.assertEqual(analysis.counts.image_files_detected, 1)
+            self.assertEqual(analysis.counts.label_files_detected, 1)
+            self.assertEqual(analysis.counts.annotations_missing, 0)
+            self.assertEqual(analysis.report_preparation.overview.split_filter, "train")
+
     def test_train_split_dataset_analysis_contains_report_ready_information(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -122,6 +148,65 @@ class DatasetAnalyzerTests(unittest.TestCase):
             self.assertIn("shape_standardization", categories)
             self.assertIn("intensity_statistics", analysis.report_preparation.sections_ready)
             self.assertIn("missing_data", analysis.report_preparation.sections_ready)
+            self.assertIn("image_label_alignment", analysis.report_preparation.sections_ready)
+            self.assertIn("intensity_scale", analysis.report_preparation.sections_ready)
+
+    def test_alignment_and_normalized_intensity_are_reported(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write_nifti(
+                root / "imagesTr" / "patient_aligned.nii.gz",
+                np.array(
+                    [-1024, -500, 0, 200, 500, 1000, 1500, 2000],
+                    dtype=np.float32,
+                ).reshape((2, 2, 2)),
+            )
+            write_nifti(
+                root / "labelsTr" / "patient_aligned.nii.gz",
+                np.ones((2, 2, 2), dtype=np.uint8),
+            )
+            write_nifti(
+                root / "imagesTr" / "patient_misaligned.nii.gz",
+                np.array(
+                    [-1024, -500, 0, 200, 500, 1000, 1500, 2000],
+                    dtype=np.float32,
+                ).reshape((2, 2, 2)),
+            )
+            write_nifti(
+                root / "labelsTr" / "patient_misaligned.nii.gz",
+                np.ones((2, 2, 3), dtype=np.uint8),
+            )
+            write_nifti(
+                root / "imagesTr" / "patient_normalized.nii.gz",
+                np.linspace(-1.0, 1.0, 8, dtype=np.float32).reshape((2, 2, 2)),
+            )
+            write_nifti(
+                root / "labelsTr" / "patient_normalized.nii.gz",
+                np.ones((2, 2, 2), dtype=np.uint8),
+            )
+
+            analysis = analyze_dataset(root, split="train")
+
+            self.assertEqual(analysis.evaluation.alignment.checked_pairs, 3)
+            self.assertEqual(analysis.evaluation.alignment.misaligned_pairs, 1)
+            self.assertEqual(
+                analysis.evaluation.alignment.misaligned_patients[0].patient_id,
+                "patient_misaligned",
+            )
+            self.assertIn(
+                "dimensions",
+                analysis.evaluation.alignment.misaligned_patients[0].issues,
+            )
+            self.assertEqual(
+                analysis.evaluation.intensity.intensity_scale.normalized_patient_ids,
+                ["patient_normalized"],
+            )
+            categories = {
+                recommendation.category
+                for recommendation in analysis.evaluation.preprocessing_recommendations
+            }
+            self.assertIn("label_alignment", categories)
+            self.assertIn("intensity_scale", categories)
 
     def test_missing_annotation_is_reported_with_patient_id(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

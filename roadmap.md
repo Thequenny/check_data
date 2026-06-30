@@ -119,17 +119,4 @@ Format:
 - Medical format
 - Use table if necessary 
 
-Modification rapport:
 
-- pas besoin de "dataset root"
-- Dans "Missing data" pas besoin de "_", juste "annotation label"
-- le tableau "memory and storage" est inutile
-- Pour tous les tableaux, la colonne "Patients", remplace le nom par "Patients number"
-- Remplacer "Slice counts" par "Slices number" et rajouter une colonne avec l'épaisseur de la couche juste avec le nombre
-- Plus besoin du tableau "Slice Thickness" et "Slice Count +Thickness" dans ce cas
-- Pas besoin du tableau "In-plane Resolution (X x Y mm)" juste le "Voxel size" suffit
-- Le tableau "voxel volume" n'est pas
-- Pas besoin du tableau "Physical Volume Size (X x Y x Z mm)" je pense
-- Tu peux enlever le tableau "Percentiles"
-- Pour les valeurs des voxels, emplacer les virgules par des points
-- Rajouter l'unité dans le tableau "Patient Intensity Summary"
