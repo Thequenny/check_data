@@ -206,6 +206,9 @@ def identify_dataset_structure(dataset_root: str | Path) -> DatasetStructure:
         raise NotADirectoryError(f"Dataset root is not a directory: {root}")
 
     warnings: list[str] = []
+    # Prefer dataset.json when it exists because it gives explicit image/label
+    # relationships. Folder and filename heuristics are used as a fallback for
+    # datasets that do not follow the Decathlon manifest format.
     manifest = _load_dataset_manifest(root, warnings)
     manifest_roles = _manifest_file_roles(manifest)
     manifest_pairs = _pairs_from_manifest(root, manifest)
@@ -387,6 +390,8 @@ def _infer_folder_roles(
     folder_role_votes: dict[str, list[str]] = defaultdict(list)
     folders = {_relative_path(root, path.parent) for path in nifti_paths}
 
+    # Roles from dataset.json are trusted first; they can identify folders even
+    # when the folder names do not contain obvious words such as image or label.
     for relative_path, role in manifest_roles.items():
         folder = str(Path(relative_path).parent).replace("\\", "/")
         if folder == ".":
@@ -402,6 +407,9 @@ def _infer_folder_roles(
             roles[folder] = _majority_vote(votes)
             continue
 
+        # If no manifest role exists, infer the role from folder tokens. This
+        # intentionally supports names like imagesTr, labelsTr, raw_image, or
+        # manual_label_maps without requiring exact folder names.
         tokens = _path_tokens(folder)
         label_score = _role_score(
             tokens,
@@ -739,6 +747,8 @@ def _infer_split_from_relative_path(relative_path: str) -> str:
 def _subject_id_from_name(filename: str) -> str:
     stem = _strip_nifti_extension(filename)
     tokens = _filename_tokens(stem)
+    # Remove role and split words so image and label filenames can collapse to
+    # the same patient id, for example patient_01_ct and patient_01_mask.
     tokens = [
         token
         for token in tokens

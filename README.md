@@ -131,5 +131,4 @@ Run all tests with:
 python -m unittest discover -s tests -v
 ```
 
-The tests generate small temporary NIfTI files, so they do not require a full
-medical imaging dataset.
+The tests create small temporary NIfTI files automatically, so no real medical dataset is required to run them

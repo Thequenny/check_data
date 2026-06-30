@@ -410,6 +410,8 @@ def analyze_dataset(
 
     root = Path(dataset_root).expanduser().resolve()
     structure = identify_dataset_structure(root)
+    # Build the patient list before reading voxel data so split filtering and
+    # missing label handling stay consistent across the JSON and report.
     work_items = _build_patient_work_items(root, structure, split)
 
     patients: list[PatientDatasetEntry] = []
@@ -534,6 +536,8 @@ def _build_patient_work_items(
 ) -> list[PatientWorkItem]:
     items_by_image: dict[str, PatientWorkItem] = {}
 
+    # Start from detected image/label pairs. This keeps labels attached to the
+    # correct image when the structure detector found a reliable relationship.
     for pair in structure.image_label_pairs:
         items_by_image[pair.image] = PatientWorkItem(
             subject_id=pair.subject_id,
@@ -543,6 +547,8 @@ def _build_patient_work_items(
             source=pair.source,
         )
 
+    # Add remaining image files without labels so missing annotations can be
+    # reported instead of silently ignored.
     for image in structure.image_files:
         if image.path in items_by_image:
             continue
@@ -556,6 +562,8 @@ def _build_patient_work_items(
 
     work_items = list(items_by_image.values())
     if split is not None:
+        # The command-line default is train; use --split all to pass None and
+        # include test/validation/unknown splits in the analysis.
         work_items = [item for item in work_items if item.split == split]
 
     return sorted(
@@ -748,6 +756,8 @@ def _evaluate_label_alignment(
         if label_metadata is None:
             continue
 
+        # Alignment is evaluated on metadata only. Reading label voxel values is
+        # unnecessary because the spatial grid is fully described by metadata.
         checked_pairs += 1
         issue = _label_alignment_issue(
             patient=patient,
@@ -778,6 +788,9 @@ def _label_alignment_issue(
 ) -> LabelAlignmentIssue | None:
     issues: list[str] = []
 
+    # A usable segmentation label must live on the same voxel grid as the image.
+    # Small affine/spacing differences are allowed to avoid false positives from
+    # floating-point header precision.
     if image_metadata.dimensions != label_metadata.dimensions:
         issues.append("dimensions")
 
@@ -1026,6 +1039,9 @@ def _patient_intensity_scale(patient: PatientDatasetEntry) -> PatientIntensitySc
 
     scale = "unknown"
     reason = "Intensity range is not clearly raw HU or normalized."
+    # This classification is intentionally conservative: only very common
+    # normalized ranges are marked as normalized; ambiguous volumes remain
+    # unknown so they can be reviewed manually.
     if (
         min_value is None
         or max_value is None
@@ -1063,6 +1079,8 @@ def _looks_like_normalized_intensity(
     if value_range <= 0.01:
         return False
 
+    # Common preprocessing outputs: min-max normalization to 0..1, symmetric
+    # scaling to -1..1, or z-score-like data centered around 0 with std near 1.
     if min_value >= -0.05 and max_value <= 1.05 and value_range >= 0.5:
         return True
     if min_value >= -1.1 and max_value <= 1.1 and value_range >= 1.0:
@@ -1078,6 +1096,9 @@ def _looks_like_normalized_intensity(
 
 def _looks_like_raw_ct_hu(min_value: float, max_value: float) -> bool:
     value_range = max_value - min_value
+    # Raw CT Hounsfield units usually include air near -1000 HU and/or high
+    # positive values for bone/contrast. The thresholds are broad because
+    # cropped or organ-focused datasets can have narrower HU ranges.
     if min_value <= -100.0 and max_value >= 100.0:
         return True
     if min_value <= -500.0 or max_value >= 1000.0:

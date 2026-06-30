@@ -171,6 +171,8 @@ def analyze_patient(
         )
     else:
         nifti_label_path = _validate_nifti_path(label_path)
+        # Labels are read as metadata only here. Dataset-level checks need their
+        # dimensions, spacing, orientation, and affine, not their voxel values.
         annotation = AnnotationInformation(
             present=True,
             path=str(nifti_label_path),
@@ -198,6 +200,8 @@ def save_patient_analysis(
 
 
 def _compute_intensity_information(data: np.ndarray) -> IntensityInformation:
+    # CT statistics should ignore NaN and infinite values, while still counting
+    # them so the dataset report can warn about invalid voxels.
     finite_mask = np.isfinite(data)
     finite_voxel_count = int(np.count_nonzero(finite_mask))
     non_finite_voxel_count = int(data.size - finite_voxel_count)
