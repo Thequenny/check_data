@@ -95,13 +95,23 @@ Output:
 HTML and PDF report:
 - Number of patients
 - Number of analysed patients
+- Missing data (specified the patient ID and the data missing)
+- Task detection:
+  -> Segmentation (if labels found)
+  -> Classification (if labels absent)
+  -> Unknown
 - Number of failed analyses
 - Minimum memory needed to run the program
 - Number and thickness of slices 2D/3D
  -> if slices different, write number of patient by slices and corresponding percentages
-- The voxel (volume) on the form: XxYxZ
+- The voxel size (resolution) and volume on the form: XxYxZ
  -> if differents sizes, write number of patiens (and percantages) having each voxel
-- Idem with the resolution
+- Intensity:
+ -> Minimum:
+ -> Maximum:
+ -> Mean:
+ -> Standard deviation:
+ -> Percentiles
 - Statistics
 - Warnings
 - Possible preprocessing recommendations
