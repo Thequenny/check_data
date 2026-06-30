@@ -63,6 +63,7 @@ class IntensityInformation:
     max: float | None
     mean: float | None
     std: float | None
+    percentiles: dict[str, float | None]
     finite_voxel_count: int
     non_finite_voxel_count: int
 
@@ -207,6 +208,7 @@ def _compute_intensity_information(data: np.ndarray) -> IntensityInformation:
             max=None,
             mean=None,
             std=None,
+            percentiles=_empty_percentiles(),
             finite_voxel_count=0,
             non_finite_voxel_count=non_finite_voxel_count,
         )
@@ -217,9 +219,31 @@ def _compute_intensity_information(data: np.ndarray) -> IntensityInformation:
         max=float(np.max(finite_data)),
         mean=float(np.mean(finite_data, dtype=np.float64)),
         std=float(np.std(finite_data, dtype=np.float64)),
+        percentiles=_compute_percentiles(finite_data),
         finite_voxel_count=finite_voxel_count,
         non_finite_voxel_count=non_finite_voxel_count,
     )
+
+
+def _compute_percentiles(data: np.ndarray) -> dict[str, float | None]:
+    percentiles = [0.5, 1, 5, 25, 50, 75, 95, 99, 99.5]
+    values = np.percentile(data, percentiles)
+    return {
+        _percentile_key(percentile): float(value)
+        for percentile, value in zip(percentiles, values, strict=True)
+    }
+
+
+def _empty_percentiles() -> dict[str, float | None]:
+    return {
+        _percentile_key(percentile): None
+        for percentile in [0.5, 1, 5, 25, 50, 75, 95, 99, 99.5]
+    }
+
+
+def _percentile_key(percentile: float) -> str:
+    label = str(percentile).replace(".", "_")
+    return f"p{label}"
 
 
 def _estimate_memory(

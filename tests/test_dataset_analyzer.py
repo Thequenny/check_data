@@ -77,13 +77,51 @@ class DatasetAnalyzerTests(unittest.TestCase):
             )
             self.assertEqual(analysis.report_preparation.overview.split_filter, "train")
             self.assertEqual(
+                analysis.report_preparation.task_detection.detected_task,
+                "segmentation",
+            )
+            self.assertTrue(analysis.report_preparation.task_detection.labels_found)
+            self.assertEqual(
                 analysis.report_preparation.overview.analysis_success_percentage,
                 100.0,
+            )
+            self.assertEqual(analysis.evaluation.missing_data, [])
+            self.assertIn(
+                "p50",
+                analysis.evaluation.intensity.patient_percentile_summaries,
+            )
+            self.assertTrue(
+                analysis.evaluation.consistency.physical_size_frequencies
             )
             self.assertIn("spatial_resampling", categories)
             self.assertIn("slice_thickness", categories)
             self.assertIn("shape_standardization", categories)
             self.assertIn("intensity_statistics", analysis.report_preparation.sections_ready)
+            self.assertIn("missing_data", analysis.report_preparation.sections_ready)
+
+    def test_missing_annotation_is_reported_with_patient_id(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write_nifti(
+                root / "imagesTs" / "patient_unlabeled.nii.gz",
+                np.zeros((2, 2, 2), dtype=np.float32),
+            )
+
+            analysis = analyze_dataset(root, split="test")
+
+            self.assertEqual(len(analysis.evaluation.missing_data), 1)
+            self.assertEqual(
+                analysis.evaluation.missing_data[0].patient_id,
+                "patient_unlabeled",
+            )
+            self.assertEqual(
+                analysis.evaluation.missing_data[0].missing_fields,
+                ["annotation_label"],
+            )
+            self.assertEqual(
+                analysis.report_preparation.missing_data[0].patient_id,
+                "patient_unlabeled",
+            )
 
     def test_dataset_analysis_can_be_saved_as_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

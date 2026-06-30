@@ -70,6 +70,18 @@ class DatasetCounts:
 
 
 @dataclass
+class MissingDataItem:
+    """Missing or unavailable patient data for future report tables."""
+
+    patient_id: str
+    split: str
+    image_path: str | None
+    label_path: str | None
+    missing_fields: list[str]
+    reason: str
+
+
+@dataclass
 class ValueSummary:
     """Generic numeric summary for non-byte values."""
 
@@ -164,6 +176,8 @@ class ConsistencyEvaluation:
     percentage_same_voxel_spacing: float
     percentage_different_voxel_spacing: float
     voxel_spacing_frequencies: list[FrequencyItem]
+    voxel_volume_mm3_summary: ValueSummary
+    physical_size_frequencies: list[FrequencyItem]
     most_common_dimensions: list[int] | None
     percentage_same_dimensions: float
     dimensions_are_consistent: bool
@@ -178,6 +192,7 @@ class IntensityEvaluation:
     global_max: float | None
     patient_mean_summary: ValueSummary
     patient_std_summary: ValueSummary
+    patient_percentile_summaries: dict[str, ValueSummary]
     finite_voxel_count: int
     non_finite_voxel_count: int
     non_finite_voxel_percentage: float
@@ -201,6 +216,7 @@ class DatasetEvaluation:
     memory: MemoryEvaluation
     consistency: ConsistencyEvaluation
     intensity: IntensityEvaluation
+    missing_data: list[MissingDataItem]
     warnings: list[str]
     preprocessing_recommendations: list[PreprocessingRecommendation]
 
@@ -224,10 +240,23 @@ class ReportOverview:
 
 
 @dataclass
+class ReportTaskDetection:
+    """Task information formatted for the future report."""
+
+    detected_task: str
+    reason: str
+    labels_found: bool
+    label_files_detected: int
+    image_label_pairs_detected: int
+
+
+@dataclass
 class ReportPreparation:
     """Data prepared by Step 2 for future HTML/PDF report generation."""
 
     overview: ReportOverview
+    task_detection: ReportTaskDetection
+    missing_data: list[MissingDataItem]
     warnings: list[str]
     preprocessing_recommendations: list[PreprocessingRecommendation]
     sections_ready: list[str]
@@ -332,9 +361,11 @@ def evaluate_dataset(
     memory = _evaluate_memory(image_metadata)
     consistency = _evaluate_consistency(image_metadata)
     intensity = _evaluate_intensity(patients)
+    missing_data = _find_missing_data(patients, failed_patients)
     warnings = _build_evaluation_warnings(
         patient_count=len(patients),
         failed_count=len(failed_patients),
+        missing_data_count=len(missing_data),
         consistency=consistency,
         intensity=intensity,
     )
@@ -351,6 +382,7 @@ def evaluate_dataset(
         memory=memory,
         consistency=consistency,
         intensity=intensity,
+        missing_data=missing_data,
         warnings=warnings,
         preprocessing_recommendations=preprocessing_recommendations,
     )
@@ -509,6 +541,16 @@ def _evaluate_consistency(image_metadata: list[NiftiMetadata]) -> ConsistencyEva
         for metadata in image_metadata
         if len(metadata.voxel_spacing) >= 3
     ]
+    voxel_volumes = [
+        metadata.physical_voxel_size_mm3
+        for metadata in image_metadata
+        if metadata.physical_voxel_size_mm3 is not None
+    ]
+    physical_sizes = [
+        _rounded_tuple(metadata.physical_size_mm[:3])
+        for metadata in image_metadata
+        if len(metadata.physical_size_mm) >= 3
+    ]
     dimensions = [tuple(metadata.dimensions) for metadata in image_metadata]
 
     orientation_frequencies = _frequency_items(orientations)
@@ -518,6 +560,7 @@ def _evaluate_consistency(image_metadata: list[NiftiMetadata]) -> ConsistencyEva
     resolution_frequencies = _frequency_items(in_plane_resolutions)
     thickness_frequencies = _frequency_items(slice_thicknesses)
     spacing_frequencies = _frequency_items(voxel_spacings)
+    physical_size_frequencies = _frequency_items(physical_sizes)
     dimension_frequencies = _frequency_items(dimensions)
 
     percentage_same_spacing = _top_percentage(spacing_frequencies)
@@ -548,6 +591,8 @@ def _evaluate_consistency(image_metadata: list[NiftiMetadata]) -> ConsistencyEva
         percentage_same_voxel_spacing=percentage_same_spacing,
         percentage_different_voxel_spacing=percentage_different_spacing,
         voxel_spacing_frequencies=spacing_frequencies,
+        voxel_volume_mm3_summary=_value_summary(voxel_volumes),
+        physical_size_frequencies=physical_size_frequencies,
         most_common_dimensions=_first_frequency_value(dimension_frequencies),
         percentage_same_dimensions=_top_percentage(dimension_frequencies),
         dimensions_are_consistent=len(dimension_frequencies) <= 1,
@@ -565,12 +610,14 @@ def _evaluate_intensity(patients: list[PatientDatasetEntry]) -> IntensityEvaluat
     finite_max_values = [item.max for item in intensities if item.max is not None]
     patient_means = [item.mean for item in intensities if item.mean is not None]
     patient_stds = [item.std for item in intensities if item.std is not None]
+    percentile_summaries = _summarize_patient_percentiles(intensities)
 
     return IntensityEvaluation(
         global_min=min(finite_min_values) if finite_min_values else None,
         global_max=max(finite_max_values) if finite_max_values else None,
         patient_mean_summary=_value_summary(patient_means),
         patient_std_summary=_value_summary(patient_stds),
+        patient_percentile_summaries=percentile_summaries,
         finite_voxel_count=finite_voxel_count,
         non_finite_voxel_count=non_finite_voxel_count,
         non_finite_voxel_percentage=_percentage(
@@ -580,9 +627,69 @@ def _evaluate_intensity(patients: list[PatientDatasetEntry]) -> IntensityEvaluat
     )
 
 
+def _find_missing_data(
+    patients: list[PatientDatasetEntry],
+    failed_patients: list[FailedPatientAnalysis],
+) -> list[MissingDataItem]:
+    missing_data: list[MissingDataItem] = []
+
+    for patient in patients:
+        missing_fields: list[str] = []
+        if patient.label_path is None:
+            missing_fields.append("annotation_label")
+        if patient.analysis.annotation.present and patient.analysis.annotation.metadata is None:
+            missing_fields.append("annotation_metadata")
+
+        if missing_fields:
+            missing_data.append(
+                MissingDataItem(
+                    patient_id=patient.subject_id,
+                    split=patient.split,
+                    image_path=patient.image_path,
+                    label_path=patient.label_path,
+                    missing_fields=missing_fields,
+                    reason="Required patient data is absent from the detected dataset structure.",
+                )
+            )
+
+    for patient in failed_patients:
+        missing_data.append(
+            MissingDataItem(
+                patient_id=patient.subject_id,
+                split=patient.split,
+                image_path=patient.image_path,
+                label_path=patient.label_path,
+                missing_fields=["analysis_result"],
+                reason=f"{patient.error_type}: {patient.error_message}",
+            )
+        )
+
+    return sorted(
+        missing_data,
+        key=lambda item: (item.split, item.patient_id, ",".join(item.missing_fields)),
+    )
+
+
+def _summarize_patient_percentiles(
+    intensities: Iterable[Any],
+) -> dict[str, ValueSummary]:
+    values_by_percentile: dict[str, list[float]] = {}
+    for intensity in intensities:
+        for percentile, value in intensity.percentiles.items():
+            if value is None:
+                continue
+            values_by_percentile.setdefault(percentile, []).append(value)
+
+    return {
+        percentile: _value_summary(values)
+        for percentile, values in sorted(values_by_percentile.items())
+    }
+
+
 def _build_evaluation_warnings(
     patient_count: int,
     failed_count: int,
+    missing_data_count: int,
     consistency: ConsistencyEvaluation,
     intensity: IntensityEvaluation,
 ) -> list[str]:
@@ -591,6 +698,8 @@ def _build_evaluation_warnings(
         warnings.append("No patient could be analyzed.")
     if failed_count:
         warnings.append(f"{failed_count} patient(s) failed during analysis.")
+    if missing_data_count:
+        warnings.append(f"{missing_data_count} patient(s) have missing data.")
     if patient_count > 0 and consistency.percentage_same_voxel_spacing < 100.0:
         warnings.append("Voxel spacing varies across CT images.")
     if patient_count > 0 and consistency.percentage_same_thickness < 100.0:
@@ -761,20 +870,33 @@ def _build_report_preparation(
         total_storage=evaluation.storage.total_file_size_readable,
         minimum_memory_needed=evaluation.memory.minimum_required_memory_readable,
     )
+    task_detection = ReportTaskDetection(
+        detected_task=structure.task_type,
+        reason=structure.task_reason,
+        labels_found=counts.label_files_detected > 0,
+        label_files_detected=counts.label_files_detected,
+        image_label_pairs_detected=counts.image_label_pairs_detected,
+    )
 
     return ReportPreparation(
         overview=overview,
+        task_detection=task_detection,
+        missing_data=evaluation.missing_data,
         warnings=evaluation.warnings,
         preprocessing_recommendations=evaluation.preprocessing_recommendations,
         sections_ready=[
             "dataset_overview",
             "patient_counts",
+            "missing_data",
+            "task_detection",
             "memory_requirements",
             "slice_count_and_thickness",
             "voxel_spacing",
+            "physical_volume",
             "resolution",
             "dimensions",
             "intensity_statistics",
+            "intensity_percentiles",
             "warnings",
             "preprocessing_recommendations",
         ],
@@ -947,6 +1069,7 @@ def _format_summary(analysis: DatasetAnalysis) -> str:
         f"Patients detected: {counts.patients_detected}",
         f"Patients analyzed: {counts.patients_analyzed}",
         f"Patients failed: {counts.patients_failed}",
+        f"Patients with missing data: {len(analysis.evaluation.missing_data)}",
         f"Total storage: {storage.total_file_size_readable}",
         f"- Images storage: {storage.image_file_size_readable}",
         f"- Labels storage: {storage.label_file_size_readable}",
@@ -983,9 +1106,21 @@ def _format_summary(analysis: DatasetAnalysis) -> str:
         "Voxel spacings (X x Y x Z mm):",
         *_format_frequency_lines(consistency.voxel_spacing_frequencies),
         "",
+        "Physical sizes (X x Y x Z mm):",
+        *_format_frequency_lines(consistency.physical_size_frequencies),
+        "",
         "Dimensions (voxels):",
         *_format_frequency_lines(consistency.dimension_frequencies),
+        "",
+        "Intensity percentiles:",
+        *_format_percentile_summary_lines(intensity.patient_percentile_summaries),
     ]
+    if analysis.evaluation.missing_data:
+        lines.append("Missing data:")
+        lines.extend(
+            f"- {item.patient_id}: {', '.join(item.missing_fields)}"
+            for item in analysis.evaluation.missing_data
+        )
     if analysis.evaluation.warnings:
         lines.append("Warnings:")
         lines.extend(f"- {warning}" for warning in analysis.evaluation.warnings)
@@ -1012,6 +1147,17 @@ def _format_frequency_value(value: Any) -> str:
     if isinstance(value, list):
         return " x ".join(str(item) for item in value)
     return str(value)
+
+
+def _format_percentile_summary_lines(
+    percentile_summaries: dict[str, ValueSummary],
+) -> list[str]:
+    if not percentile_summaries:
+        return ["- none"]
+    return [
+        f"- {percentile}: median {summary.median}, mean {summary.mean}"
+        for percentile, summary in percentile_summaries.items()
+    ]
 
 
 def main(argv: list[str] | None = None) -> int:

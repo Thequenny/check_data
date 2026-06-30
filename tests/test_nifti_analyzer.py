@@ -60,6 +60,8 @@ class NiftiAnalyzerTests(unittest.TestCase):
                 analysis.intensity.std,
                 float(np.std(data, dtype=np.float64)),
             )
+            self.assertEqual(analysis.intensity.percentiles["p50"], 11.5)
+            self.assertIn("p99", analysis.intensity.percentiles)
 
     def test_patient_analysis_handles_present_and_missing_annotation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
