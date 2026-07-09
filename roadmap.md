@@ -99,8 +99,7 @@ To do:
 
 Input: `data\analyse_dataset.json`
 
-Output:
-
+Output: 
 HTML report:
 - Number of patients
 - Number of analysed patients
@@ -120,15 +119,16 @@ HTML report:
  -> Maximum
  -> Mean
  -> Standard deviation
-- Statistics
+- Statistics 
 - Warnings
 - Possible preprocessing recommendations
 
 Format:
 - Medical format
-- Use table if necessary 
+- Use table if necessary (you must makes them understandable for a human)
 - For the big values, always use "." and not ","
 - Not write words like "x_y" form except dataset name or patients ID
 - Specify the units if necessary 
+- If they are percentages, you must make sure that the total percentage for each dada is 100% and take up to 3 digits after the decimal point for each percentage
 
 

@@ -4,6 +4,7 @@ import json
 import sys
 import tempfile
 import unittest
+from decimal import Decimal
 from pathlib import Path
 
 import nibabel as nib
@@ -150,6 +151,42 @@ class DatasetAnalyzerTests(unittest.TestCase):
             self.assertIn("missing_data", analysis.report_preparation.sections_ready)
             self.assertIn("image_label_alignment", analysis.report_preparation.sections_ready)
             self.assertIn("intensity_scale", analysis.report_preparation.sections_ready)
+
+    def test_frequency_percentages_sum_to_100_after_rounding(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            for index, spacing in enumerate([1.0, 2.0, 3.0], start=1):
+                patient_id = f"patient_{index}"
+                write_nifti(
+                    root / "imagesTr" / f"{patient_id}.nii.gz",
+                    np.zeros((2, 2, 2), dtype=np.float32),
+                    spacing=(1.0, 1.0, spacing),
+                )
+                write_nifti(
+                    root / "labelsTr" / f"{patient_id}.nii.gz",
+                    np.ones((2, 2, 2), dtype=np.uint8),
+                    spacing=(1.0, 1.0, spacing),
+                )
+
+            analysis = analyze_dataset(root, split="train")
+            percentage_sum = sum(
+                Decimal(str(item.percentage))
+                for item in analysis.evaluation.consistency.voxel_spacing_frequencies
+            )
+            decimal_lengths = [
+                -Decimal(str(item.percentage)).as_tuple().exponent
+                for item in analysis.evaluation.consistency.voxel_spacing_frequencies
+            ]
+
+            self.assertEqual(percentage_sum, Decimal("100.0"))
+            self.assertTrue(all(length <= 3 for length in decimal_lengths))
+            self.assertEqual(
+                [
+                    item.percentage
+                    for item in analysis.evaluation.consistency.voxel_spacing_frequencies
+                ],
+                [33.334, 33.333, 33.333],
+            )
 
     def test_alignment_and_normalized_intensity_are_reported(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

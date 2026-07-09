@@ -712,7 +712,7 @@ def _evaluate_consistency(image_metadata: list[NiftiMetadata]) -> ConsistencyEva
 
     percentage_same_spacing = _top_percentage(spacing_frequencies)
     percentage_different_spacing = (
-        round(100.0 - percentage_same_spacing, 2) if spacing_frequencies else 0.0
+        round(100.0 - percentage_same_spacing, 3) if spacing_frequencies else 0.0
     )
 
     return ConsistencyEvaluation(
@@ -1393,7 +1393,7 @@ def _slice_thickness(metadata: NiftiMetadata) -> float | None:
 def _percentage(part: int | float, total: int | float) -> float:
     if total == 0:
         return 0.0
-    return round((float(part) / float(total)) * 100.0, 2)
+    return round((float(part) / float(total)) * 100.0, 3)
 
 
 def _value_summary(values: Iterable[int | float | None]) -> ValueSummary:
@@ -1461,17 +1461,17 @@ def _frequency_items(values: Iterable[Any]) -> list[FrequencyItem]:
     if not values_list:
         return []
 
-    total = len(values_list)
     counter = Counter(values_list)
+    percentages = _frequency_percentages(list(counter.values()))
     items = []
-    for value, count in counter.items():
+    for (value, count), percentage in zip(counter.items(), percentages, strict=True):
         json_value = _json_value(value)
         items.append(
             FrequencyItem(
                 value=json_value,
                 display_value=_format_frequency_value(json_value),
                 count=count,
-                percentage=round((count / total) * 100.0, 2),
+                percentage=percentage,
             )
         )
 
@@ -1485,17 +1485,38 @@ def _slice_thickness_frequency_items(
     if not values_list:
         return []
 
-    total = len(values_list)
     counter = Counter(values_list)
+    percentages = _frequency_percentages(list(counter.values()))
     items = [
         SliceThicknessFrequencyItem(
             thickness_mm=value,
             count=count,
-            percentage=round((count / total) * 100.0, 2),
+            percentage=percentage,
         )
-        for value, count in counter.items()
+        for (value, count), percentage in zip(counter.items(), percentages, strict=True)
     ]
     return sorted(items, key=lambda item: (-item.count, item.thickness_mm or 0.0))
+
+
+def _frequency_percentages(counts: list[int]) -> list[float]:
+    """Return three-decimal percentages that add up to exactly 100.000."""
+
+    total = sum(counts)
+    if total == 0:
+        return [0.0 for _ in counts]
+
+    raw_units = [count * 100000 for count in counts]
+    units = [value // total for value in raw_units]
+    remainders = [value % total for value in raw_units]
+    missing_units = 100000 - sum(units)
+
+    for index in sorted(
+        range(len(counts)),
+        key=lambda item: (-remainders[item], -counts[item], item),
+    )[:missing_units]:
+        units[index] += 1
+
+    return [unit / 1000.0 for unit in units]
 
 
 def _top_percentage(

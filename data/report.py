@@ -86,8 +86,16 @@ def _build_html_report(analysis: dict[str, Any]) -> str:
                     ],
                     ["Annotations present", counts["annotations_present"]],
                     ["Annotations missing", counts["annotations_missing"]],
-                    ["Analysis success", f"{overview['analysis_success_percentage']}%"],
-                    ["Annotation coverage", f"{overview['annotation_coverage_percentage']}%"],
+                    [
+                        "Analysis success",
+                        _format_percentage(overview["analysis_success_percentage"]),
+                    ],
+                    [
+                        "Annotation coverage",
+                        _format_percentage(
+                            overview["annotation_coverage_percentage"]
+                        ),
+                    ],
                 ],
                 class_name="kv",
             ),
@@ -121,7 +129,10 @@ def _build_html_report(analysis: dict[str, Any]) -> str:
                     ["Checked image/label pairs", alignment["checked_pairs"]],
                     ["Aligned pairs", alignment["aligned_pairs"]],
                     ["Misaligned pairs", alignment["misaligned_pairs"]],
-                    ["Alignment", f"{alignment['alignment_percentage']}%"],
+                    [
+                        "Alignment",
+                        _format_percentage(alignment["alignment_percentage"]),
+                    ],
                     ["Explanation", alignment["explanation"]],
                 ]
             )
@@ -151,15 +162,7 @@ def _build_html_report(analysis: dict[str, Any]) -> str:
             "Intensity Statistics",
             _subsection(
                 "Patient Intensity Summary",
-                _global_intensity_table(
-                    [
-                        ["Global minimum", "HU", intensity["global_min"]],
-                        ["Global maximum", "HU", intensity["global_max"]],
-                    ]
-                )
-                + _intensity_statistics_table(
-                    intensity["patient_intensity_statistics_table"]
-                ),
+                _intensity_summary_table(intensity),
             )
             + _subsection(
                 "Intensity Scale Check",
@@ -203,12 +206,12 @@ def _build_html_report(analysis: dict[str, Any]) -> str:
                         [
                             "Valid voxels",
                             f"{_format_voxel_count_text(intensity['voxel_validity']['valid_voxels_readable'])} "
-                            f"({intensity['voxel_validity']['valid_voxel_percentage']}%)",
+                            f"({_format_percentage(intensity['voxel_validity']['valid_voxel_percentage'])})",
                         ],
                         [
                             "Non-finite voxels",
                             f"{_format_voxel_count_text(intensity['voxel_validity']['non_finite_voxels_readable'])} "
-                            f"({intensity['voxel_validity']['non_finite_voxel_percentage']}%)",
+                            f"({_format_percentage(intensity['voxel_validity']['non_finite_voxel_percentage'])})",
                         ],
                         ["Explanation", intensity["voxel_validity"]["explanation"]],
                     ]
@@ -222,23 +225,36 @@ def _build_html_report(analysis: dict[str, Any]) -> str:
                 [
                     [
                         "Same in-plane resolution",
-                        f"{consistency['percentage_same_resolution']}%",
+                        _format_percentage(consistency["percentage_same_resolution"]),
                     ],
-                    ["Same slice count", f"{consistency['percentage_same_slice_count']}%"],
+                    [
+                        "Same slice count",
+                        _format_percentage(consistency["percentage_same_slice_count"]),
+                    ],
                     [
                         "Same slice thickness",
-                        f"{consistency['percentage_same_thickness']}%",
+                        _format_percentage(consistency["percentage_same_thickness"]),
                     ],
                     [
                         "Same voxel spacing",
-                        f"{consistency['percentage_same_voxel_spacing']}%",
+                        _format_percentage(
+                            consistency["percentage_same_voxel_spacing"]
+                        ),
                     ],
                     [
                         "Different voxel spacing",
-                        f"{consistency['percentage_different_voxel_spacing']}%",
+                        _format_percentage(
+                            consistency["percentage_different_voxel_spacing"]
+                        ),
                     ],
-                    ["Same dimensions", f"{consistency['percentage_same_dimensions']}%"],
-                    ["Same orientation", f"{consistency['percentage_same_orientation']}%"],
+                    [
+                        "Same dimensions",
+                        _format_percentage(consistency["percentage_same_dimensions"]),
+                    ],
+                    [
+                        "Same orientation",
+                        _format_percentage(consistency["percentage_same_orientation"]),
+                    ],
                     [
                         "Dimensions are consistent",
                         _yes_no(consistency["dimensions_are_consistent"]),
@@ -406,7 +422,11 @@ def _frequency_table(items: list[dict[str, Any]]) -> str:
     return _table(
         ["Value", "Number of patients", "Percentage"],
         (
-            [_frequency_display_value(item), item["count"], f"{item['percentage']}%"]
+            [
+                _frequency_display_value(item),
+                item["count"],
+                _format_percentage(item["percentage"]),
+            ]
             for item in items
         ),
     )
@@ -416,7 +436,11 @@ def _slice_thickness_table(items: list[dict[str, Any]]) -> str:
     return _table(
         ["Thickness (mm)", "Number of patients", "Percentage"],
         (
-            [item["thickness_mm"], item["count"], f"{item['percentage']}%"]
+            [
+                item["thickness_mm"],
+                item["count"],
+                _format_percentage(item["percentage"]),
+            ]
             for item in items
         ),
     )
@@ -430,7 +454,7 @@ def _slice_number_thickness_table(items: list[dict[str, Any]]) -> str:
                 item["value"][0],
                 item["value"][1],
                 item["count"],
-                f"{item['percentage']}%",
+                _format_percentage(item["percentage"]),
             ]
             for item in items
         ),
@@ -482,26 +506,11 @@ def _misaligned_patients_table(items: list[dict[str, Any]]) -> str:
     )
 
 
-def _intensity_statistics_table(items: list[dict[str, Any]]) -> str:
+def _intensity_summary_table(intensity: dict[str, Any]) -> str:
     return _table(
-        ["Statistic", "Unit", "Number of patients", "Minimum", "Maximum", "Mean", "Median"],
-        (
-            [
-                item["statistic"],
-                item["unit"],
-                item["count"],
-                item["min"],
-                item["max"],
-                item["mean"],
-                item["median"],
-            ]
-            for item in items
-        ),
+        ["Statistic", "Unit", "Value", "Meaning"],
+        _intensity_summary_rows(intensity),
     )
-
-
-def _global_intensity_table(rows: Iterable[Iterable[Any]]) -> str:
-    return _table(["Statistic", "Unit", "Value"], rows)
 
 
 def _normalized_patients_table(items: list[dict[str, Any]]) -> str:
@@ -634,7 +643,7 @@ def _build_text_report(analysis: dict[str, Any]) -> list[str]:
             ("Checked image/label pairs", alignment["checked_pairs"]),
             ("Aligned pairs", alignment["aligned_pairs"]),
             ("Misaligned pairs", alignment["misaligned_pairs"]),
-            ("Alignment", f"{alignment['alignment_percentage']}%"),
+            ("Alignment", _format_percentage(alignment["alignment_percentage"])),
         ],
     )
     _add_table_lines(
@@ -660,7 +669,12 @@ def _build_text_report(analysis: dict[str, Any]) -> list[str]:
         lines,
         ["Number of slices", "Slice thickness (mm)", "Number of patients", "%"],
         (
-            [item["value"][0], item["value"][1], item["count"], item["percentage"]]
+            [
+                item["value"][0],
+                item["value"][1],
+                item["count"],
+                _format_percentage(item["percentage"]),
+            ]
             for item in consistency["slice_count_thickness_frequencies"]
         ),
     )
@@ -705,19 +719,8 @@ def _build_text_report(analysis: dict[str, Any]) -> list[str]:
     )
     _add_table_lines(
         lines,
-        ["Statistic", "Unit", "Number of patients", "Min", "Max", "Mean", "Median"],
-        (
-            [
-                item["statistic"],
-                item["unit"],
-                item["count"],
-                item["min"],
-                item["max"],
-                item["mean"],
-                item["median"],
-            ]
-            for item in intensity["patient_intensity_statistics_table"]
-        ),
+        ["Statistic", "Unit", "Value", "Meaning"],
+        _intensity_summary_rows(intensity),
     )
     _add_key_values(
         lines,
@@ -761,7 +764,40 @@ def _build_text_report(analysis: dict[str, Any]) -> list[str]:
 
 def _frequency_text_rows(items: list[dict[str, Any]]) -> Iterable[list[Any]]:
     for item in items:
-        yield [_frequency_display_value(item), item["count"], item["percentage"]]
+        yield [
+            _frequency_display_value(item),
+            item["count"],
+            _format_percentage(item["percentage"]),
+        ]
+
+
+def _intensity_summary_rows(intensity: dict[str, Any]) -> list[list[Any]]:
+    return [
+        [
+            "Minimum intensity",
+            "HU",
+            intensity["global_min"],
+            "Lowest voxel intensity in the dataset.",
+        ],
+        [
+            "Maximum intensity",
+            "HU",
+            intensity["global_max"],
+            "Highest voxel intensity in the dataset.",
+        ],
+        [
+            "Mean intensity",
+            "HU",
+            intensity["patient_mean_summary"]["mean"],
+            "Average of the patient mean intensities.",
+        ],
+        [
+            "Standard deviation",
+            "HU",
+            intensity["patient_std_summary"]["mean"],
+            "Average of patient intensity standard deviations.",
+        ],
+    ]
 
 
 def _frequency_display_value(item: dict[str, Any]) -> Any:
@@ -795,6 +831,13 @@ def _format_label(value: str) -> str:
 
 def _format_voxel_count_text(value: str) -> str:
     return value.replace(",", ".")
+
+
+def _format_percentage(value: float | int | None) -> str:
+    if value is None:
+        return "Not available"
+    formatted = f"{float(value):.3f}".rstrip("0").rstrip(".")
+    return f"{formatted}%"
 
 
 def _add_title(lines: list[str], title: str) -> None:
