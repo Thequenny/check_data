@@ -31,10 +31,9 @@ def CTdcm_to_Nii(CT_dir, output_buffer, nii_dir):
     dcm_files = []
     if case_buffer.exists():
         shutil.rmtree(case_buffer)
-
     case_buffer.mkdir(parents=True, exist_ok=True)
 
-    #
+    # Sort the folder to keep only the .dcm files 
     for element in CT_dir.iterdir():
         if element.is_file(): 
         

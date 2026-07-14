@@ -29,6 +29,17 @@ Goals:
 
 #### Phase 1.1: Reading of NIfTI files
 
+Goal:
+Analyze a dataset and assure that all files are type `.nii/.nii.gz`. Else, integrate the function `general_conversion.py`.
+
+To do:
+- Iterate through the entire dataset and verify if all
+files are `.nii/.nii.gz` files. if `.dcm` file, run the function `general_conversion.py` for convert in `.nii/.nii.gz`. I want that you think about the best way to do that. 
+- Certain files will not convert because only series that form a coherent CT stack can be converted. So, if they are this case, generate a `Warning.txt` file to highlight conversion problems. Be clear when you write the reasons and mention in this file that the HTML report can't be generate. 
+- If problem during the conversion, don't do the other phases and step: Stop here
+
+#### Phase 1.2: Reading of NIfTI files
+
 To do:
 - Load `.nii/.nii.gz` files with always nibabel
 - Extract:
@@ -40,7 +51,7 @@ To do:
 
 Use dataclass for more practicality.
 
-#### Phase 1.2: Analysis of one patient
+#### Phase 1.3: Analysis of one patient
 
 Goal:
 Analyze one CT and compute important parameters which are going to be used in the step 2.
@@ -52,7 +63,7 @@ Compute:
 - min, max and mean intensity
 - Standard deviation.
 
-#### Phase 1.3: Storage of information
+#### Phase 1.4: Storage of information
 
 Goal:
 Storage and output of the informations. 
@@ -95,7 +106,8 @@ To do:
  -> Dimension consistency check
 - Save all informations in the .json output file.
 
-### Step 3: Report generation named `report.py` in the folder `data/`
+
+### Step 4: Report generation named `report.py` in the folder `data/`
 
 Input: `data\analyse_dataset.json`
 
