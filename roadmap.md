@@ -35,8 +35,14 @@ Analyze a dataset and assure that all files are type `.nii/.nii.gz`. Else, integ
 To do:
 - Iterate through the entire dataset and verify if all
 files are `.nii/.nii.gz` files. if `.dcm` file, run the function `general_conversion.py` for convert in `.nii/.nii.gz`. I want that you think about the best way to do that. 
-- Certain files will not convert because only series that form a coherent CT stack can be converted. So, if they are this case, generate a `Warning.txt` file to highlight conversion problems. Be clear when you write the reasons and mention in this file that the HTML report can't be generate. 
-- If problem during the conversion, don't do the other phases and step: Stop here
+- Certain files will not convert because only series that form a coherent CT stack can be converted. So, if they are this case, generate a `Warning.txt` file to highlight conversion problems. Not write the path of the serie, just write number of the serie and the reason. I want something clear. And mention in this file that the HTML report can't be generate.
+- Don't generate the HTML even if they are only one serie which was unable to convert
+- Reset the folder to its original state if there are non-convertible series.
+- If problem during the conversion, don't do the other phases and step: Stop the program here!
+
+Implementation note:
+- `nifti_analyzer.py` keeps the reusable NIfTI/DICOM preparation helper, but its command-line entry point stays limited to one patient `.nii/.nii.gz` file.
+- Dataset folder input and Phase 1.1 orchestration are handled by `dataset_analyzer.py`, which stops before later phases if conversion writes `Warning.txt`.
 
 #### Phase 1.2: Reading of NIfTI files
 
@@ -142,5 +148,4 @@ Format:
 - Not write words like "x_y" form except dataset name or patients ID
 - Specify the units if necessary 
 - If they are percentages, you must make sure that the total percentage for each dada is 100% and take up to 3 digits after the decimal point for each percentage
-
 
