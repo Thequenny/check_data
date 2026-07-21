@@ -58,7 +58,7 @@ LABEL_FOLDER_HINTS = {
     "segmentations",
 }
 
-IMAGE_FOLDER_SUBSTRINGS = {"image"}
+IMAGE_FOLDER_SUBSTRINGS = {"image", "serie", "series"}
 LABEL_FOLDER_SUBSTRINGS = {"label"}
 
 IMAGE_NAME_HINTS = {
@@ -66,6 +66,8 @@ IMAGE_NAME_HINTS = {
     "image",
     "img",
     "scan",
+    "serie",
+    "series",
     "volume",
 }
 
@@ -694,9 +696,17 @@ def _class_folder_key(folder: str) -> str | None:
         tokens = _path_tokens(part)
         if any(token in SPLIT_HINTS for token in tokens):
             continue
-        if any(token in IMAGE_FOLDER_HINTS for token in tokens):
+        if _role_score(
+            tokens,
+            exact_hints=IMAGE_FOLDER_HINTS,
+            substring_hints=IMAGE_FOLDER_SUBSTRINGS,
+        ):
             return None
-        if any(token in LABEL_FOLDER_HINTS for token in tokens):
+        if _role_score(
+            tokens,
+            exact_hints=LABEL_FOLDER_HINTS,
+            substring_hints=LABEL_FOLDER_SUBSTRINGS,
+        ):
             return None
         return part
     return None

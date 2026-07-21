@@ -10,10 +10,14 @@ This module implements Step 1 of the roadmap:
 from __future__ import annotations
 
 import argparse
+import contextlib
+import importlib
+import io
 import json
+import shutil
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 
@@ -27,7 +31,55 @@ else:
 
 
 NIFTI_EXTENSIONS = (".nii.gz", ".nii")
+DICOM_EXTENSION = ".dcm"
 DEFAULT_OUTPUT = Path(__file__).resolve().parents[1] / "data" / "CT_data.json"
+DEFAULT_PREPARED_DATASET_DIRNAME = "converted_nifti"
+DEFAULT_CONVERSION_BUFFER_DIRNAME = ".conversion_buffer"
+DEFAULT_WARNING_FILENAME = "Warning.txt"
+DEFAULT_WARNING_PATH = (
+    Path(__file__).resolve().parents[1] / "data" / DEFAULT_WARNING_FILENAME
+)
+MINIMUM_DICOM_CT_SLICES = 4
+
+
+@dataclass
+class ConversionIssue:
+    """One DICOM conversion problem that blocks later analysis phases."""
+
+    path: str
+    reason: str
+
+
+@dataclass
+class DatasetNiftiPreparation:
+    """Result of Phase 1.1 dataset preparation."""
+
+    dataset_root: str
+    prepared_dataset_root: str
+    nifti_file_count: int
+    dicom_file_count: int
+    converted_file_count: int
+    conversion_was_needed: bool
+    warning_path: str | None
+    issues: list[ConversionIssue]
+
+    @property
+    def can_continue(self) -> bool:
+        return not self.issues
+
+
+class DatasetNiftiPreparationError(RuntimeError):
+    """Raised when DICOM conversion blocks later analysis phases."""
+
+    def __init__(
+        self,
+        message: str,
+        warning_path: Path,
+        issues: list[ConversionIssue],
+    ) -> None:
+        super().__init__(message)
+        self.warning_path = str(warning_path)
+        self.issues = issues
 
 
 @dataclass
@@ -204,6 +256,86 @@ def save_patient_analysis(
         json.dump(analysis.to_dict(), file, indent=2)
 
 
+def prepare_dataset_nifti_files(
+    dataset_root: str | Path,
+    output_dir: str | Path | None = None,
+    warning_path: str | Path | None = None,
+) -> DatasetNiftiPreparation:
+    """Ensure a dataset can continue as .nii/.nii.gz files only.
+
+    If DICOM files are found, they are converted through
+    ``general_conversion.CTdcm_to_Nii`` into a prepared NIfTI folder. If any
+    series cannot produce a coherent CT volume, Warning.txt is written to the
+    project data folder, generated conversion folders are removed, and later
+    phases are blocked.
+    """
+
+    root = _validate_dataset_root(dataset_root)
+    prepared_root = _prepared_dataset_root(root, output_dir)
+    conversion_buffer = root / DEFAULT_CONVERSION_BUFFER_DIRNAME
+    warning_file = _warning_file_path(root, warning_path)
+    _remove_file_if_exists(warning_file)
+
+    files = list(
+        _iter_dataset_files(
+            root,
+            excluded_dirs=[prepared_root, conversion_buffer],
+        )
+    )
+    nifti_files = [path for path in files if _is_nifti_file(path)]
+    dicom_files = [path for path in files if _is_dicom_file(path)]
+
+    if not dicom_files:
+        return DatasetNiftiPreparation(
+            dataset_root=str(root),
+            prepared_dataset_root=str(root),
+            nifti_file_count=len(nifti_files),
+            dicom_file_count=0,
+            converted_file_count=0,
+            conversion_was_needed=False,
+            warning_path=None,
+            issues=[],
+        )
+
+    _reset_preparation_directory(prepared_root, root)
+    _reset_preparation_directory(conversion_buffer, root)
+    _copy_nifti_files_to_prepared_root(nifti_files, root, prepared_root)
+
+    converted_files, issues = _convert_dicom_files(
+        dicom_files=dicom_files,
+        dataset_root=root,
+        output_buffer=conversion_buffer,
+        prepared_root=prepared_root,
+    )
+
+    if issues:
+        _write_conversion_warning(
+            warning_file=warning_file,
+            dicom_file_count=len(dicom_files),
+            issues=issues,
+        )
+        _cleanup_preparation_directories(prepared_root, conversion_buffer, root)
+        raise DatasetNiftiPreparationError(
+            (
+                "DICOM conversion failed during Phase 1.1. "
+                f"Details were written to: {warning_file}"
+            ),
+            warning_file,
+            issues,
+        )
+
+    return DatasetNiftiPreparation(
+        dataset_root=str(root),
+        prepared_dataset_root=str(prepared_root),
+        nifti_file_count=len(nifti_files) + len(converted_files),
+        dicom_file_count=len(dicom_files),
+        converted_file_count=len(converted_files),
+        conversion_was_needed=True,
+        warning_path=None,
+        issues=[],
+    )
+
+
 def _compute_intensity_information(data: np.ndarray) -> IntensityInformation:
     # CT statistics should ignore NaN and infinite values, while still counting
     # them so the dataset report can warn about invalid voxels.
@@ -313,6 +445,326 @@ def _patient_id_from_path(path: Path) -> str:
     return path.stem
 
 
+def _validate_dataset_root(path: str | Path) -> Path:
+    root = Path(path).expanduser().resolve()
+    if not root.exists():
+        raise FileNotFoundError(f"Dataset root does not exist: {root}")
+    if not root.is_dir():
+        raise NotADirectoryError(f"Dataset root is not a directory: {root}")
+    return root
+
+
+def _prepared_dataset_root(root: Path, output_dir: str | Path | None) -> Path:
+    if output_dir is None:
+        return (root / DEFAULT_PREPARED_DATASET_DIRNAME).resolve()
+
+    prepared_root = Path(output_dir).expanduser().resolve()
+    if prepared_root == root:
+        raise ValueError(
+            "The prepared NIfTI output directory cannot be the dataset root "
+            "because the original DICOM files must remain separated."
+        )
+    return prepared_root
+
+
+def _warning_file_path(_root: Path, warning_path: str | Path | None) -> Path:
+    if warning_path is None:
+        return DEFAULT_WARNING_PATH.resolve()
+    return Path(warning_path).expanduser().resolve()
+
+
+def _iter_dataset_files(
+    root: Path,
+    excluded_dirs: list[Path],
+) -> list[Path]:
+    excluded_roots = [path.resolve() for path in excluded_dirs]
+    files: list[Path] = []
+    for path in root.rglob("*"):
+        resolved = path.resolve()
+        if any(_is_same_or_inside(resolved, excluded) for excluded in excluded_roots):
+            continue
+        if resolved.is_file():
+            files.append(resolved)
+    return files
+
+
+def _reset_preparation_directory(path: Path, dataset_root: Path) -> None:
+    resolved_path = path.resolve()
+    resolved_root = dataset_root.resolve()
+    if resolved_path == resolved_root or not _is_inside(resolved_path, resolved_root):
+        raise ValueError(
+            "For safety, generated conversion directories must be inside the "
+            f"dataset root. Got: {resolved_path}"
+        )
+
+    if resolved_path.exists():
+        shutil.rmtree(resolved_path)
+    resolved_path.mkdir(parents=True, exist_ok=True)
+
+
+def _cleanup_preparation_directories(
+    prepared_root: Path,
+    conversion_buffer: Path,
+    dataset_root: Path,
+) -> None:
+    for path in [prepared_root, conversion_buffer]:
+        resolved_path = path.resolve()
+        resolved_root = dataset_root.resolve()
+        if resolved_path == resolved_root or not _is_inside(resolved_path, resolved_root):
+            raise ValueError(
+                "For safety, generated conversion directories must be inside the "
+                f"dataset root. Got: {resolved_path}"
+            )
+        if resolved_path.exists():
+            shutil.rmtree(resolved_path)
+
+
+def _remove_file_if_exists(path: Path) -> None:
+    if path.exists() and path.is_file():
+        path.unlink()
+
+
+def _copy_nifti_files_to_prepared_root(
+    nifti_files: list[Path],
+    dataset_root: Path,
+    prepared_root: Path,
+) -> None:
+    for source in nifti_files:
+        relative_path = source.relative_to(dataset_root)
+        destination = prepared_root / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+
+
+def _convert_dicom_files(
+    dicom_files: list[Path],
+    dataset_root: Path,
+    output_buffer: Path,
+    prepared_root: Path,
+) -> tuple[list[Path], list[ConversionIssue]]:
+    converter, import_issue = _load_general_conversion_function()
+    if converter is None:
+        return [], [
+            ConversionIssue(
+                path=str(dicom_dir),
+                reason=import_issue or "DICOM conversion function is unavailable.",
+            )
+            for dicom_dir, _series_files in _group_dicom_files_by_directory(dicom_files)
+        ]
+
+    converted_files: list[Path] = []
+    issues: list[ConversionIssue] = []
+
+    for series_index, (dicom_dir, series_files) in enumerate(
+        _group_dicom_files_by_directory(dicom_files),
+        start=1,
+    ):
+        skip_reason = _dicom_series_skip_reason(series_files)
+        if skip_reason is not None:
+            issues.append(ConversionIssue(path=str(dicom_dir), reason=skip_reason))
+            continue
+
+        staged_dicom_dir = _stage_dicom_series(
+            dicom_dir=dicom_dir,
+            dicom_files=series_files,
+            output_buffer=output_buffer,
+            series_index=series_index,
+        )
+        series_prepared_root = prepared_root / dicom_dir.relative_to(dataset_root)
+        series_prepared_root.mkdir(parents=True, exist_ok=True)
+        before_conversion = set(_find_nifti_files(prepared_root))
+        try:
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(
+                io.StringIO()
+            ):
+                converter(staged_dicom_dir, output_buffer, series_prepared_root)
+        except Exception as exc:
+            issues.append(
+                ConversionIssue(
+                    path=str(dicom_dir),
+                    reason=(
+                        "general_conversion.CTdcm_to_Nii raised "
+                        f"{type(exc).__name__}: {exc}"
+                    ),
+                )
+            )
+            continue
+
+        after_conversion = set(_find_nifti_files(prepared_root))
+        new_files = sorted(after_conversion - before_conversion)
+        if not new_files:
+            issues.append(
+                ConversionIssue(
+                    path=str(dicom_dir),
+                    reason=(
+                        "No .nii or .nii.gz file was produced. The DICOM "
+                        "series may not form a coherent CT stack."
+                    ),
+                )
+            )
+            continue
+
+        converted_files.extend(new_files)
+
+    return converted_files, issues
+
+
+def _load_general_conversion_function() -> tuple[
+    Callable[[Path, Path, Path], Any] | None,
+    str | None,
+]:
+    try:
+        module = importlib.import_module("general_conversion")
+    except Exception as exc:
+        return (
+            None,
+            (
+                "Could not import general_conversion.CTdcm_to_Nii. "
+                f"Reason: {type(exc).__name__}: {exc}"
+            ),
+        )
+
+    converter = getattr(module, "CTdcm_to_Nii", None)
+    if not callable(converter):
+        return None, "general_conversion.CTdcm_to_Nii is missing or not callable."
+    return converter, None
+
+
+def _group_dicom_files_by_directory(
+    dicom_files: list[Path],
+) -> list[tuple[Path, list[Path]]]:
+    grouped: dict[Path, list[Path]] = {}
+    for path in sorted(dicom_files):
+        grouped.setdefault(path.parent, []).append(path)
+    return sorted(grouped.items(), key=lambda item: str(item[0]))
+
+
+def _stage_dicom_series(
+    dicom_dir: Path,
+    dicom_files: list[Path],
+    output_buffer: Path,
+    series_index: int,
+) -> Path:
+    staged_root = output_buffer / "_dicom_input"
+    staged_dir = staged_root / _safe_folder_name(
+        f"{series_index:04d}_{dicom_dir.name}"
+    )
+    if staged_dir.exists():
+        shutil.rmtree(staged_dir)
+    staged_dir.mkdir(parents=True, exist_ok=True)
+
+    for source in dicom_files:
+        shutil.copy2(source, staged_dir / source.name)
+
+    return staged_dir
+
+
+def _safe_folder_name(value: str) -> str:
+    safe_characters = [
+        character if character.isalnum() or character in "-_." else "_"
+        for character in value
+    ]
+    safe_name = "".join(safe_characters).strip("._")
+    return safe_name or "dicom_series"
+
+
+def _dicom_series_skip_reason(dicom_files: list[Path]) -> str | None:
+    if len(dicom_files) < MINIMUM_DICOM_CT_SLICES:
+        return (
+            f"Only {len(dicom_files)} DICOM slice(s) were found. A coherent CT "
+            f"stack requires at least {MINIMUM_DICOM_CT_SLICES} slices."
+        )
+
+    try:
+        from pydicom import dcmread
+    except ImportError:
+        return None
+
+    try:
+        first_dicom = dcmread(
+            str(dicom_files[0]),
+            stop_before_pixels=True,
+            force=True,
+        )
+    except Exception as exc:
+        return f"The first DICOM header could not be read: {type(exc).__name__}: {exc}"
+
+    modality = str(getattr(first_dicom, "Modality", "")).upper()
+    if modality and modality != "CT":
+        return f"The series modality is '{modality}', not CT."
+
+    series_description = str(
+        getattr(first_dicom, "SeriesDescription", "")
+    ).lower()
+    image_type = _dicom_image_type_as_text(getattr(first_dicom, "ImageType", []))
+    if "scout" in series_description or "localizer" in image_type:
+        return "Scout/localizer DICOM series are not coherent CT stacks."
+
+    return None
+
+
+def _dicom_image_type_as_text(image_type: Any) -> str:
+    if isinstance(image_type, str):
+        return image_type.lower()
+    try:
+        return " ".join(str(value).lower() for value in image_type)
+    except TypeError:
+        return str(image_type).lower()
+
+
+def _find_nifti_files(root: Path) -> list[Path]:
+    if not root.exists():
+        return []
+    return sorted(
+        path.resolve()
+        for path in root.rglob("*")
+        if path.is_file() and _is_nifti_file(path)
+    )
+
+
+def _write_conversion_warning(
+    warning_file: Path,
+    dicom_file_count: int,
+    issues: list[ConversionIssue],
+) -> None:
+    warning_file.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "WARNING: DICOM to NIfTI conversion failed",
+        "",
+        "The analyzer stopped at Phase 1.1.",
+        (
+            "The HTML report can't be generated because at least one DICOM "
+            "series could not be converted."
+        ),
+        f"DICOM files detected: {dicom_file_count}",
+        "",
+        "Conversion problems:",
+    ]
+    lines.extend(_format_conversion_issue(issue) for issue in issues)
+    warning_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _format_conversion_issue(issue: ConversionIssue) -> str:
+    series_name = Path(issue.path).name or "unknown series"
+    return f"- {series_name}: {issue.reason}"
+
+
+def _is_dicom_file(path: Path) -> bool:
+    return path.suffix.lower() == DICOM_EXTENSION
+
+
+def _is_same_or_inside(path: Path, parent: Path) -> bool:
+    return path == parent or _is_inside(path, parent)
+
+
+def _is_inside(path: Path, parent: Path) -> bool:
+    try:
+        path.relative_to(parent)
+    except ValueError:
+        return False
+    return True
+
+
 def _validate_nifti_path(path: str | Path) -> Path:
     nifti_path = Path(path).expanduser().resolve()
     if not nifti_path.exists():
@@ -339,7 +791,10 @@ def _require_nibabel() -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Analyze one NIfTI CT volume.")
-    parser.add_argument("image", help="Path to the patient CT image (.nii or .nii.gz).")
+    parser.add_argument(
+        "image",
+        help="Path to the patient CT image (.nii or .nii.gz).",
+    )
     parser.add_argument(
         "--label",
         help="Optional path to the patient annotation/label (.nii or .nii.gz).",

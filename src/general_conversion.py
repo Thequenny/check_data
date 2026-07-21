@@ -13,9 +13,6 @@ data_CT_dir=os.path.join(project_dir,"data_base_CT")
 data_Nii_dir=os.path.join(project_dir,"data_base_nii")
 buffer=os.path.join(project_dir,"temp")
 
-os.makedirs(data_Nii_dir, exist_ok=True)
-os.makedirs(buffer, exist_ok=True)
-
 def CTdcm_to_Nii(CT_dir, output_buffer, nii_dir):
 
     CT_dir = Path(CT_dir)
@@ -85,4 +82,7 @@ def CTdcm_to_Nii(CT_dir, output_buffer, nii_dir):
         break
     
 
-CTdcm_to_Nii(data_CT_dir, buffer, data_Nii_dir)
+if __name__ == "__main__":
+    os.makedirs(data_Nii_dir, exist_ok=True)
+    os.makedirs(buffer, exist_ok=True)
+    CTdcm_to_Nii(data_CT_dir, buffer, data_Nii_dir)

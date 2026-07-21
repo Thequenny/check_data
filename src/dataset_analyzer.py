@@ -17,7 +17,13 @@ from statistics import mean, median
 from typing import Any, Iterable
 
 from check_structure_dataset import DatasetStructure, identify_dataset_structure
-from nifti_analyzer import NiftiMetadata, PatientAnalysis, analyze_patient
+from nifti_analyzer import (
+    DatasetNiftiPreparationError,
+    NiftiMetadata,
+    PatientAnalysis,
+    analyze_patient,
+    prepare_dataset_nifti_files,
+)
 
 
 SPATIAL_ROUNDING_DIGITS = 3
@@ -411,6 +417,8 @@ def analyze_dataset(
     """
 
     root = Path(dataset_root).expanduser().resolve()
+    preparation = prepare_dataset_nifti_files(root)
+    root = Path(preparation.prepared_dataset_root)
     structure = identify_dataset_structure(root)
     # Build the patient list before reading voxel data so split filtering and
     # missing label handling stay consistent across the JSON and report.
@@ -1805,7 +1813,13 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     selected_split = None if args.split == "all" else args.split
-    analysis = analyze_dataset(args.dataset_root, split=selected_split)
+    try:
+        analysis = analyze_dataset(args.dataset_root, split=selected_split)
+    except DatasetNiftiPreparationError as exc:
+        print(str(exc))
+        print(f"Warning file: {exc.warning_path}")
+        return 1
+
     if args.json:
         print(json.dumps(analysis.to_dict(), indent=2))
     else:

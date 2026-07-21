@@ -79,6 +79,19 @@ class DatasetStructureDiscoveryTests(unittest.TestCase):
             self.assertEqual(structure.label_folders, ["manual_label_maps"])
             self.assertEqual(len(structure.image_label_pairs), 1)
 
+    def test_converted_series_folders_are_detected_as_images(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            touch(root / "serie_003" / "0003_serie_003.nii.gz")
+
+            structure = identify_dataset_structure(root)
+
+            self.assertEqual(structure.task_type, "classification")
+            self.assertEqual(structure.classification_classes, [])
+            self.assertEqual(structure.image_folders, ["serie_003"])
+            self.assertEqual(len(structure.image_files), 1)
+            self.assertEqual(structure.unknown_files, [])
+
     def test_class_folders_are_classification(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)

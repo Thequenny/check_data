@@ -1,0 +1,36 @@
+WARNING: DICOM to NIfTI conversion failed
+
+The analyzer stopped at Phase 1.1.
+The HTML report can't be generated because at least one DICOM series could not be converted.
+DICOM files detected: 1772
+
+Conversion problems:
+- serie_001: Only 3 DICOM slice(s) were found. A coherent CT stack requires at least 4 slices.
+- serie_002: Only 2 DICOM slice(s) were found. A coherent CT stack requires at least 4 slices.
+- serie_004: Only 1 DICOM slice(s) were found. A coherent CT stack requires at least 4 slices.
+- serie_007: Only 3 DICOM slice(s) were found. A coherent CT stack requires at least 4 slices.
+- serie_008: Only 1 DICOM slice(s) were found. A coherent CT stack requires at least 4 slices.
+- serie_009: Only 2 DICOM slice(s) were found. A coherent CT stack requires at least 4 slices.
+- serie_010: The series modality is 'MR', not CT.
+- serie_012: Only 1 DICOM slice(s) were found. A coherent CT stack requires at least 4 slices.
+- serie_014: Only 1 DICOM slice(s) were found. A coherent CT stack requires at least 4 slices.
+- serie_017: Only 1 DICOM slice(s) were found. A coherent CT stack requires at least 4 slices.
+- serie_018: No .nii or .nii.gz file was produced. The DICOM series may not form a coherent CT stack.
+- serie_019: Only 1 DICOM slice(s) were found. A coherent CT stack requires at least 4 slices.
+- serie_021: Only 1 DICOM slice(s) were found. A coherent CT stack requires at least 4 slices.
+- serie_022: No .nii or .nii.gz file was produced. The DICOM series may not form a coherent CT stack.
+- serie_026: Only 2 DICOM slice(s) were found. A coherent CT stack requires at least 4 slices.
+- serie_029: No .nii or .nii.gz file was produced. The DICOM series may not form a coherent CT stack.
+- serie_032: Only 2 DICOM slice(s) were found. A coherent CT stack requires at least 4 slices.
+- serie_033: Only 3 DICOM slice(s) were found. A coherent CT stack requires at least 4 slices.
+- serie_035: Only 1 DICOM slice(s) were found. A coherent CT stack requires at least 4 slices.
+- serie_036: No .nii or .nii.gz file was produced. The DICOM series may not form a coherent CT stack.
+- serie_037: Only 2 DICOM slice(s) were found. A coherent CT stack requires at least 4 slices.
+- serie_041: No .nii or .nii.gz file was produced. The DICOM series may not form a coherent CT stack.
+- serie_042: Only 1 DICOM slice(s) were found. A coherent CT stack requires at least 4 slices.
+- serie_043: Only 2 DICOM slice(s) were found. A coherent CT stack requires at least 4 slices.
+- serie_044: Only 2 DICOM slice(s) were found. A coherent CT stack requires at least 4 slices.
+- serie_045: Only 2 DICOM slice(s) were found. A coherent CT stack requires at least 4 slices.
+- serie_046: Only 3 DICOM slice(s) were found. A coherent CT stack requires at least 4 slices.
+- serie_048: Only 2 DICOM slice(s) were found. A coherent CT stack requires at least 4 slices.
+- serie_049: No .nii or .nii.gz file was produced. The DICOM series may not form a coherent CT stack.
