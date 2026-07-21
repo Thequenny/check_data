@@ -12,25 +12,16 @@ The project was tested with Medical Segmentation Decathlon datasets, including
 
 - Detects dataset structure, training/test folders, image folders, label
   folders, metadata files, and image/label pairs.
-- Supports standard Medical Segmentation Decathlon layouts such as
-  `imagesTr`, `labelsTr`, and `imagesTs`.
-- Supports non-standard folder names when they contain image/label hints, such
-  as `raw_image_volumes` or `manual_label_maps`.
+- Supports standard layouts such as `imagesTr`, `labelsTr`, and `imagesTs`.
+- Supports non-standard folder names when they contain image/label hints, such as `raw_image_volumes` or `manual_label_maps`.
 - Infers whether the dataset is likely a segmentation, classification, or
   unknown task.
 - Reads `.nii` and `.nii.gz` files with `nibabel`.
 - Extracts dimensions, number of slices, voxel spacing, slice thickness,
-  orientation, datatype, affine matrix, physical size, file size, and memory
-  estimates.
-- Computes CT intensity statistics: minimum, maximum, mean, standard deviation,
-  percentiles, finite voxels, and non-finite voxels.
-- Compares patients for consistency of dimensions, resolution, voxel spacing,
-  slice thickness, slice count, physical size, and orientation.
-- Checks whether image and label volumes are aligned.
-- Detects CT images that look normalized instead of raw Hounsfield units.
-- Writes JSON outputs and an HTML report.
-- Can prepare datasets containing DICOM files by converting valid CT series to
-  NIfTI before analysis.
+  orientation, datatype, affine matrix, physical size, file size, and memory estimates.
+- Compares patients for consistency of dimensions, resolution, voxel spacing, slice thickness, slice count, physical size, and computes statistical data.
+- Writes an HTML report.
+
 
 ## Requirements
 
@@ -50,25 +41,6 @@ pip install pydicom dicom2nifti
 
 The HTML and PDF report generator does not require extra Python packages.
 
-## Project Structure
-
-```text
-check_data/
-  src/
-    check_structure_dataset.py
-    nifti_analyzer.py
-    dataset_analyzer.py
-    general_conversion.py
-  data/
-    report.py
-    analyse_dataset.json
-    report.html
-    Warning.txt
-  dataset/
-    Task02_Heart/
-    Task09_Spleen/
-  tests/
-```
 
 ## Supported Inputs
 
@@ -137,6 +109,7 @@ Choose a custom output path:
 python src\nifti_analyzer.py dataset\Task09_Spleen\imagesTr\spleen_10.nii.gz --label dataset\Task09_Spleen\labelsTr\spleen_10.nii.gz --output data\CT_data.json
 ```
 
+
 ### Step 2: Analyze a Full Dataset
 
 ```powershell
@@ -170,6 +143,7 @@ Print the full dataset analysis JSON to the terminal:
 python src\dataset_analyzer.py dataset\Task09_Spleen --json
 ```
 
+
 ### Step 3: Generate the Report
 
 Generate the HTML report from the default dataset analysis JSON:
@@ -195,6 +169,7 @@ The report includes:
 - Consistency statistics
 - preprocessing recommendations
 
+
 ## Example Workflow
 
 ```powershell
@@ -203,6 +178,7 @@ python src\dataset_analyzer.py dataset\Task02_Heart --output data\analyse_datase
 python data\report.py --input data\analyse_dataset.json --html data\report.html
 start data\report.html
 ```
+
 
 ## Tests
 
